@@ -1,0 +1,39 @@
+
+	Home License -- for personal use only.  Not for government,
+	academic, research, commercial, or other organizational use.
+
+Starting parallel pool (parpool) using the 'Threads' profile ...
+Connected to parallel pool with 6 workers.
+jointstar2.estimate: T=208 quarters, 66 parameters, parallel=1
+SMC: N=2000, d=66, M=4 MH steps, ESS target 50%, seed 42
+  stage   1  phi=0.00821  ESS   2000->  1000  acc=0.06  7.3s
+  stage   2  phi=0.01793  ESS   2000->  1000  acc=0.07  9.3s
+  stage   3  phi=0.02916  ESS   2000->  1000  acc=0.12  8.8s
+  stage   4  phi=0.04417  ESS   2000->  1000  acc=0.28  13.5s
+  stage   5  phi=0.06897  ESS   2000->  1000  acc=0.45  18.2s
+  stage   6  phi=0.10298  ESS   2000->  1000  acc=0.49  20.1s
+  stage   7  phi=0.14018  ESS   2000->  1000  acc=0.48  20.5s
+  stage   8  phi=0.18330  ESS   2000->  1000  acc=0.48  21.0s
+  stage   9  phi=0.23371  ESS   2000->  1000  acc=0.51  21.6s
+  stage  10  phi=0.29299  ESS   2000->  1000  acc=0.53  21.9s
+  stage  11  phi=0.36551  ESS   2000->  1000  acc=0.52  21.9s
+  stage  12  phi=0.44939  ESS   2000->  1000  acc=0.53  22.0s
+  stage  13  phi=0.53691  ESS   2000->  1000  acc=0.52  22.9s
+  stage  14  phi=0.63022  ESS   2000->  1000  acc=0.51  21.8s
+  stage  15  phi=0.72804  ESS   2000->  1000  acc=0.50  30.0s
+  stage  16  phi=0.83526  ESS   2000->  1000  acc=0.51  23.7s
+  stage  17  phi=0.95387  ESS   2000->  1000  acc=0.51  24.3s
+  stage  18  phi=1.00000  ESS   2000->  1807  acc=0.51  24.4s
+done: 5.9 min wall-clock, logZ = -588.27
+     param        mean          sd          q05          q50          q95   
+    ________    _________    _________    ________    _________    _________
+
+    "gamma2"    -0.081163     0.076686    -0.20523    -0.080514     0.033329
+    "phi1"         1.2062     0.048542      1.1266        1.207       1.2836
+    "phi2"       -0.43104     0.057102    -0.51998     -0.43474     -0.32175
+    "nu"        -0.073552     0.036977    -0.13132     -0.07448    -0.013209
+    "alpha"       0.37855     0.014782     0.35299      0.37952      0.40192
+    "sig_gz"     0.052927    0.0032268     0.04748     0.052989     0.058026
+    "sig_xi"      0.15729     0.021261     0.12342      0.15644      0.19219
+
+Parallel pool using the 'Threads' profile is shutting down.

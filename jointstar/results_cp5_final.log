@@ -1,0 +1,67 @@
+
+	Home License -- for personal use only.  Not for government,
+	academic, research, commercial, or other organizational use.
+
+Starting parallel pool (parpool) using the 'Threads' profile ...
+Connected to parallel pool with 6 workers.
+jointstar2.estimate: T=206 quarters, 410 parameters, parallel=1
+SMC: N=2000, d=410, M=2 MH steps, ESS target 50%, seed 42
+  stage   1  phi=0.00593  ESS   2000->  1000  acc=0.26  88.6s
+  stage   2  phi=0.01251  ESS   2000->  1000  acc=0.21  81.7s
+  stage   3  phi=0.02050  ESS   2000->  1000  acc=0.20  84.1s
+  stage   4  phi=0.03080  ESS   2000->  1000  acc=0.31  98.7s
+  stage   5  phi=0.04251  ESS   2000->  1000  acc=0.34  106.6s
+  stage   6  phi=0.05539  ESS   2000->  1000  acc=0.37  102.2s
+  stage   7  phi=0.07008  ESS   2000->  1000  acc=0.28  114.6s
+  stage   8  phi=0.08733  ESS   2000->  1000  acc=0.28  116.0s
+  stage   9  phi=0.10779  ESS   2000->  1000  acc=0.27  109.3s
+  stage  10  phi=0.13160  ESS   2000->  1000  acc=0.27  106.3s
+  stage  11  phi=0.15752  ESS   2000->  1000  acc=0.26  107.8s
+  stage  12  phi=0.18368  ESS   2000->  1000  acc=0.24  114.1s
+  stage  13  phi=0.21236  ESS   2000->  1000  acc=0.24  116.3s
+  stage  14  phi=0.24406  ESS   2000->  1000  acc=0.24  113.2s
+  stage  15  phi=0.27705  ESS   2000->  1000  acc=0.24  111.0s
+  stage  16  phi=0.31081  ESS   2000->  1000  acc=0.24  112.1s
+  stage  17  phi=0.34760  ESS   2000->  1000  acc=0.24  112.1s
+  stage  18  phi=0.38559  ESS   2000->  1000  acc=0.23  113.7s
+  stage  19  phi=0.42335  ESS   2000->  1000  acc=0.23  107.9s
+  stage  20  phi=0.46402  ESS   2000->  1000  acc=0.22  114.9s
+  stage  21  phi=0.51295  ESS   2000->  1000  acc=0.23  125.8s
+  stage  22  phi=0.57301  ESS   2000->  1000  acc=0.23  125.3s
+  stage  23  phi=0.64216  ESS   2000->  1000  acc=0.22  120.9s
+  stage  24  phi=0.71973  ESS   2000->  1000  acc=0.20  119.0s
+  stage  25  phi=0.79848  ESS   2000->  1000  acc=0.21  121.8s
+  stage  26  phi=0.87553  ESS   2000->  1000  acc=0.19  117.1s
+  stage  27  phi=0.95036  ESS   2000->  1000  acc=0.24  118.6s
+  stage  28  phi=1.00000  ESS   2000->  1457  acc=0.24  128.3s
+done: 51.9 min wall-clock, logZ = -510.40
+IDENTIFIED off-diagonals (90% band excludes 0): 12 of 112
+         L_entry          group     median         q05           q95       band_excludes_zero
+    __________________    _____    _________    __________    _________    __________________
+
+    "Lq_Ustar_c"            2       -0.39188      -0.62175     -0.26033          true        
+    "Lq_pie_c"              2        0.24293      0.032052       1.0312          true        
+    "Lq_kstar_c"            2         0.1784       0.09228      0.32084          true        
+    "Lq_gk_c"               4        0.10328      0.042697       0.1627          true        
+    "Lq_xi_c"               2        0.12037    0.00011168       0.3106          true        
+    "Lq_zstar_Ustar"        2       -0.22807      -0.53503    -0.022426          true        
+    "Lq_zstar_pie"          2        0.27152      0.040069      0.56762          true        
+    "Lq_prstar_zstar"       2       -0.25333      -0.41457    -0.029589          true        
+    "Lq_gk_kstar"           4       -0.52454      -0.74466     -0.34252          true        
+    "Lq_hppstar_wstar"      2       -0.29353         -0.59    -0.064133          true        
+    "Lr_U_y"                1      -0.078805      -0.16349    -0.019103          true        
+    "Lr_lpr_U"              1        0.24223      0.030866      0.46333          true        
+
+       param           mean           sd           q05          q50           q95   
+    ____________    ___________    _________    _________    __________    _________
+
+    "gamma2"           -0.32472       0.0549     -0.40617      -0.33092     -0.22521
+    "nu"            -0.00024846     0.029343    -0.044161    -0.0011269     0.047549
+    "sig_gz"           0.033533    0.0035805     0.027683      0.033469     0.039419
+    "sig_xi"            0.15817     0.031517      0.10523       0.16082       0.2071
+    "hs_tau2_g1"      0.0034377    0.0017031       0.0025     0.0026649    0.0066291
+    "hs_tau2_g2"        0.02259     0.015238    0.0075672      0.018796      0.04989
+    "hs_tau2_g3"       0.019827     0.034716       0.0025     0.0097197      0.06923
+    "hs_tau2_g4"      0.0035355    0.0013123       0.0025     0.0030727    0.0061854
+
+Parallel pool using the 'Threads' profile is shutting down.
