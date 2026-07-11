@@ -1,0 +1,196 @@
+# Model orchestration policy
+
+You (Fable, the orchestrator) plan the econometric/statistical
+approach, decide identification and specification strategy, review
+sub-agent output, and verify results. Do not write or run bulk MATLAB
+code yourself — delegate it to the appropriate sub-agent below.
+
+## Available models for sub-agents
+
+- claude-haiku-4-5-20251001 — cheapest. Use for: running .m scripts,
+  formatting output, generating boilerplate diagnostic tables, simple
+  data-cleaning/reshaping steps.
+- claude-sonnet-5 — mid-cost. Use for: writing non-trivial MATLAB code
+  (custom filters/estimators, simulation loops), debugging errors from
+  a Haiku sub-agent, spec-vs-spec writeups that need real reasoning.
+- claude-opus-4-8 — reserve only if Sonnet's output fails your
+  verification twice in a row on the same subtask.
+
+## Sub-agents
+
+- **code-auditor** (Haiku) — read-only. Greps for lag/lead
+  misalignment, hardcoded magic numbers, silent NaN-drops, unit
+  mismatches, and this project's specific known bug classes (horseshoe
+  exclusion-list integrity, `mutateIdx`/`'fixed'`-prior handling,
+  sign-restriction enforcement). First-pass mechanical sweep.
+- **uc-estimator** (Haiku) — runs `jointstar.estimate` (precision-based
+  SMC, not a Kalman filter/MLE) for a given spec + options. Returns
+  per-stage tempering diagnostics, final log-marginal-likelihood, and
+  posterior summary. Does not make modeling decisions and does not
+  treat a single seed as final.
+- **convergence-runner** (Haiku) — reruns uc-estimator across ≥3
+  independent seeds and computes the Gelman-style R̂ agreement
+  statistic across the resulting particle clouds; pools them into one
+  stratified posterior when agreement is weak. This project's
+  identification/pile-up check — see "Convergence discipline" below.
+- **diagnostics-runner** (Haiku) — runs `jointstar.diagnostics`
+  (ESS/acceptance/wall-clock + posterior summary),
+  `jointstar.horseshoeDiag` (shrinkage/identification of covariance
+  off-diagonals), and `jointstar.validate` (CI-overlap vs the in-house
+  baseline's Table 3). Reports plainly; does not judge whether a result
+  is "good."
+- **spec-comparator** (Sonnet) — given two model variants' diagnostics,
+  log-marginal-likelihoods, and Table-3 CI-overlap counts, writes up
+  whether the added component/parameter earns its keep. Use only when
+  the tradeoff is genuinely ambiguous, and only after both variants
+  have passed the convergence-runner check (a single-seed comparison is
+  not evidence).
+- **spec-improver** (Sonnet) — read-only. Given the current known-open-
+  issues list and latest diagnostics, proposes concrete, testable
+  candidate model changes ranked by expected payoff/risk. Proposes in
+  prose only; never edits code or reverses an owner ruling itself.
+- **matlab-debugger** (Sonnet) — debugs a failed MATLAB script handed
+  back from uc-estimator when the error isn't a simple fix.
+
+## Workflow
+
+1. Plan the step (what needs checking or estimating, and why).
+2. Dispatch to the cheapest sub-agent/model capable of doing it.
+3. Inspect the returned result yourself — don't just relay it.
+4. Verify: check SMC-stage health (ESS, acceptance rate, resample
+   count) rather than a classical convergence flag; check whether a
+   diagnostic flag is a real problem or a deliberate simplification;
+   check whether a log-marginal-likelihood or CI-overlap improvement
+   survives the multi-seed convergence check before crediting it to
+   the spec change rather than a favorable ridge draw.
+5. Escalate model tier (Sonnet, then Opus) only when verification
+   fails or the tradeoff is genuinely ambiguous — not by default.
+6. Never let a sub-agent silently re-parameterize, drop a component,
+   or reverse an owner ruling (see below) to make an error or an
+   awkward diagnostic go away — surface it and propose in prose
+   instead, per the project's own working norm (`fable_project_brief.md`).
+
+## Project context
+
+- **Toolbox**: custom precision-based Bayesian SMC estimator in
+  `jointstar/+jointstar/` — NOT the Econometrics Toolbox `ssm`/`estimate`
+  and NOT a classical Kalman-filter MLE. It combines Chan-Jeliazkov
+  (2009) sparse-precision state marginalization as the likelihood
+  evaluator inside a Herbst-Schorfheide (2014) adaptive-tempering SMC
+  over the parameter vector θ — a synthesis specific to this project,
+  not a named published method (see `METHODOLOGY_NOTE.md`, and note the
+  explicit distinction there from SMC² — this is *not* that). Practical
+  consequence: there is no "optimizer exit flag" or classical standard
+  error; "convergence" means SMC-stage health (ESS, MH acceptance) on a
+  single run, plus cross-seed R̂ agreement for anything quotable.
+- **Data**: `data.csv` at repo root, quarterly, 1974Q3-2025Q4 (T=206
+  for GDP-linked series); `cash_rate_pa` starts 1993Q1, `pi_e` starts
+  1985Q1 — availability masks are data-driven
+  (`jointstar.loadData` drops Excel junk rows, parses `dd/MM/uuuu`
+  headers manually). Units: 100·log for quantity levels, percentage
+  points for rates; inflation = 400·Δlog(trimmed-mean CPI index); real
+  rate = `cash_rate_pa` − `pi_e`. No Consensus survey data (proprietary,
+  estimated off-site) — `pi_e` is the only trend-inflation anchor
+  currently in the model.
+- **Known nesting special case**: `jointstar.estimate(..., 'Horseshoe',
+  false, 'HierKappa', false)` (the CP4/CP4_rees diagonal-Q baseline)
+  nests exactly inside the full `'Horseshoe', true, 'HierKappa', true`
+  spec — identity off-diagonal factors reproduce it exactly. Useful as
+  a regression/sensitivity check after touching the covariance layer.
+- **Final/production spec call**: `jointstar.estimate('data.csv',
+  'NParticles', 2000, 'Seed', 42, 'Horseshoe', true, 'HierKappa',
+  true)`. A single such call is NOT the quotable answer for structural
+  parameters — see "Convergence discipline" below.
+- **Instrumentation (added CP9)**: every run now records per-stage
+  log-marginal-likelihood (`lml_inc` in `smc_log.csv`, total in
+  `out.lml`) and `jointstar.horseshoeDiag` writes a group-level τ_g
+  table (`tau_group.csv`). LML noise floor: ~10 log points across seeds
+  at N=2000 — single-run LML differences below that are sampler noise;
+  Bayes-factor comparisons need multi-seed LML means. A `'RidgeAtoms'`
+  option exists (glues documented ridge pairs into shared MH blocks) —
+  evaluated in CHECKPOINT_09 and left OFF by default: it improved some
+  target ridges but worsened others and did not reduce population-level
+  seed instability. Don't enable it for production runs without reading
+  CHECKPOINT_09 §5 first.
+- **MATLAB**: R2026a at `/Applications/MATLAB_R2026a.app/bin/matlab`
+  (confirmed **not** on `PATH` — sub-agents must call the full path,
+  e.g. `/Applications/MATLAB_R2026a.app/bin/matlab -batch "..."`). 6-core
+  Home license, Parallel Computing Toolbox licensed (Threads pool
+  works). Tests: `runtests('tests')` from the `jointstar/` root (20
+  tests green as of the last full run).
+
+## Convergence discipline (read before estimating or judging any result)
+
+- This model's structural parameters are **not seed-stable** in a
+  single SMC run: an independent 3-seed check (42/7/101,
+  `jointstar/benchmarks/runConvergenceCheck.m`) found max R̂ ≈ 5.3 on
+  several parameters (e.g. ρ_hpp, κ_y2020) — the posterior lives on
+  long ridges, this is not a sampler bug. Latent states (r*, NAIRU,
+  gap) are far more robust across seeds than the structural parameters
+  are.
+- Anything that will be **quoted, compared across specs, or reported
+  as "improved"** must be checked across ≥3 independent seeds
+  (`convergence-runner`) and, when agreement is weak, pooled
+  (`jointstar/benchmarks/poolRuns.m`: an equal-weight mixture of the
+  seeds' particle clouds is a valid stratified posterior estimator —
+  the current quotable table is `jointstar/results/pooled_posterior.csv`).
+- A single-seed improvement in log-marginal-likelihood or Table-3
+  CI-overlap is **not sufficient evidence** of a real specification
+  improvement on its own — it can just be a favorable ridge draw.
+  Escalate to the pooled/multi-seed check before accepting any spec
+  change as real.
+- `TaskStop`/killing a shell mid-run can leave a zombie MATLAB process
+  (`MATLAB_maca64`) that keeps writing to a shared log file, making
+  diagnostics look like they went backward. Use a run-unique log file
+  per invocation, and `pkill MATLAB_maca64` before starting a fresh run
+  if a prior one was aborted.
+
+## Owner rulings — treat as fixed, not as bugs
+
+These were explicit decisions made after specific findings during the
+build. Do not silently reverse or "fix" any of them — if new evidence
+suggests one should be revisited, flag the specific evidence and get
+sign-off before touching it:
+
+- `sme_pieobs` (pi_e measurement-error sd) is FIXED at 0.30 (`'fixed'`
+  prior type, excluded from `mutateIdx`) — not a free parameter.
+- All gap-shock cross-correlations are excluded from the horseshoe
+  (`EXCLUDE_GAP` in `horseshoePriors.m`) so the IS coefficient ν and the
+  Okun loadings aren't re-absorbed into a reduced-form shock
+  correlation.
+- φ_y, φ_u (COVID stringency loadings) are sign-restricted < 0 via
+  truncated normal.
+- Trimmed-mean inflation only — no separate headline-CPI Phillips-curve
+  equation, despite one appearing in the source transcription's Table 1.
+
+## Known open issues (candidate audit/improvement targets)
+
+From `jointstar/checkpoints/CHECKPOINT_08.md` and
+`jointstar/docs/03_validation_vs_baseline`:
+
+- 17/23 Table-3 quantities have overlapping 90% CIs vs the in-house
+  baseline; 6 do not.
+- Gap-AR "hump" shape: total persistence φ1+φ2 matches the baseline but
+  the shape differs — a likelihood ridge where the prior decides.
+- ρ_U vs. Okun-loading split disagrees with the baseline (same
+  ridge/trade-off pathology).
+- Phillips-curve slope: −0.16 (this model) vs. −0.09 (baseline) —
+  weakly identified, prior-driven.
+- r* remains the least-identified latent state (band ±2.5pp+) absent
+  any neutral-rate proxy; `pi_e` is the only trend-inflation anchor
+  available.
+- Only ~17 of 106 covariance off-diagonals are identified by the
+  horseshoe; measurement and cross blocks are essentially empty,
+  correlations concentrated in the trend/drift blocks.
+
+## Reasoning effort / model tier guidance
+
+Default your own (Fable's) reasoning effort to high, not the deepest
+setting. Reserve the deepest tier for:
+- the initial planning/decomposition step on a genuinely hard
+  specification question
+- adjudicating a specific escalated conflict between sub-agent results
+
+Running the whole session at maximum reasoning effort defeats the
+point of this pattern — most of your turns are "read this diagnostic
+table and route to the next sub-agent," which doesn't need it.
