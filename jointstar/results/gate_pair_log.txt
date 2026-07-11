@@ -1,0 +1,82 @@
+
+	Home License -- for personal use only.  Not for government,
+	academic, research, commercial, or other organizational use.
+
+Starting parallel pool (parpool) using the 'Threads' profile ...
+Connected to parallel pool with 6 workers.
+jointstar.estimate: T=206 quarters, 405 parameters, parallel=1
+SMC: N=1000, d=405, M=2 MH steps, ESS target 50%, seed 42
+  stage   1  phi=0.00505  ESS   1000->   500  acc=0.24  31.8s
+  stage   2  phi=0.01093  ESS   1000->   500  acc=0.19  28.8s
+  stage   3  phi=0.01802  ESS   1000->   500  acc=0.27  37.5s
+  stage   4  phi=0.02769  ESS   1000->   500  acc=0.30  44.0s
+  stage   5  phi=0.03827  ESS   1000->   500  acc=0.34  41.3s
+  stage   6  phi=0.04972  ESS   1000->   500  acc=0.37  45.3s
+  stage   7  phi=0.06425  ESS   1000->   500  acc=0.31  47.5s
+  stage   8  phi=0.08333  ESS   1000->   500  acc=0.31  44.9s
+  stage   9  phi=0.10355  ESS   1000->   500  acc=0.32  45.0s
+  stage  10  phi=0.12553  ESS   1000->   500  acc=0.32  44.2s
+  stage  11  phi=0.15212  ESS   1000->   500  acc=0.32  45.8s
+  stage  12  phi=0.18385  ESS   1000->   500  acc=0.31  46.2s
+  stage  13  phi=0.22099  ESS   1000->   500  acc=0.28  45.2s
+  stage  14  phi=0.26375  ESS   1000->   500  acc=0.29  45.2s
+  stage  15  phi=0.30780  ESS   1000->   500  acc=0.27  44.4s
+  stage  16  phi=0.35535  ESS   1000->   500  acc=0.27  44.9s
+  stage  17  phi=0.40236  ESS   1000->   500  acc=0.27  45.7s
+  stage  18  phi=0.44514  ESS   1000->   500  acc=0.27  43.0s
+  stage  19  phi=0.48757  ESS   1000->   500  acc=0.26  42.4s
+  stage  20  phi=0.53481  ESS   1000->   500  acc=0.26  54.2s
+  stage  21  phi=0.58655  ESS   1000->   500  acc=0.26  57.8s
+  stage  22  phi=0.63882  ESS   1000->   500  acc=0.25  61.1s
+  stage  23  phi=0.68431  ESS   1000->   500  acc=0.24  67.9s
+  stage  24  phi=0.72531  ESS   1000->   500  acc=0.24  68.6s
+  stage  25  phi=0.76875  ESS   1000->   500  acc=0.25  51.2s
+  stage  26  phi=0.82396  ESS   1000->   500  acc=0.25  47.6s
+  stage  27  phi=0.88416  ESS   1000->   500  acc=0.25  46.1s
+  stage  28  phi=0.94174  ESS   1000->   500  acc=0.25  49.2s
+  stage  29  phi=1.00000  ESS   1000->   547  acc=0.26  46.8s
+SMC done: 29 stages, 1365.6 s wall-clock, total LML = -626.3572
+done: 22.8 min wall-clock, total LML = -626.36
+jointstar.estimate: T=206 quarters, 405 parameters, parallel=1
+SMC: N=1000, d=405, M=2 MH steps, ESS target 50%, seed 42
+  stage   1  phi=0.00505  ESS   1000->   500  acc=0.25  30.3s
+  stage   2  phi=0.01102  ESS   1000->   500  acc=0.19  30.7s
+  stage   3  phi=0.01820  ESS   1000->   500  acc=0.28  33.1s
+  stage   4  phi=0.02836  ESS   1000->   500  acc=0.30  33.2s
+  stage   5  phi=0.04198  ESS   1000->   500  acc=0.34  39.8s
+  stage   6  phi=0.05674  ESS   1000->   500  acc=0.37  40.2s
+  stage   7  phi=0.07280  ESS   1000->   500  acc=0.30  44.4s
+  stage   8  phi=0.09215  ESS   1000->   500  acc=0.30  44.9s
+  stage   9  phi=0.11484  ESS   1000->   500  acc=0.31  43.0s
+  stage  10  phi=0.13865  ESS   1000->   500  acc=0.29  41.4s
+  stage  11  phi=0.16058  ESS   1000->   500  acc=0.30  44.0s
+  stage  12  phi=0.18214  ESS   1000->   500  acc=0.30  43.3s
+  stage  13  phi=0.20870  ESS   1000->   500  acc=0.30  41.9s
+  stage  14  phi=0.24293  ESS   1000->   500  acc=0.32  41.5s
+  stage  15  phi=0.28430  ESS   1000->   500  acc=0.30  42.7s
+  stage  16  phi=0.32944  ESS   1000->   500  acc=0.30  44.3s
+  stage  17  phi=0.37997  ESS   1000->   500  acc=0.29  45.6s
+  stage  18  phi=0.42918  ESS   1000->   500  acc=0.30  53.1s
+  stage  19  phi=0.47880  ESS   1000->   500  acc=0.29  50.7s
+  stage  20  phi=0.53291  ESS   1000->   500  acc=0.30  54.7s
+  stage  21  phi=0.59308  ESS   1000->   500  acc=0.29  60.3s
+  stage  22  phi=0.65564  ESS   1000->   500  acc=0.28  58.1s
+  stage  23  phi=0.71757  ESS   1000->   500  acc=0.27  58.7s
+  stage  24  phi=0.78357  ESS   1000->   500  acc=0.27  58.8s
+  stage  25  phi=0.85455  ESS   1000->   500  acc=0.27  59.3s
+  stage  26  phi=0.92725  ESS   1000->   500  acc=0.26  62.2s
+  stage  27  phi=1.00000  ESS   1000->   501  acc=0.25  58.3s
+SMC done: 27 stages, 1259.5 s wall-clock, total LML = -650.9127
+done: 21.0 min wall-clock, total LML = -650.91
+
+ans = 
+
+  struct with fields:
+
+        smc: [1×1 struct]
+    summary: [405×6 table]
+     states: [206×16 table]
+        dat: [1×1 struct]
+     priors: [1×1 struct]
+
+Parallel pool using the 'Threads' profile is shutting down.

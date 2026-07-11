@@ -63,12 +63,25 @@ function out = runSMC(prob, opts)
 %                   rejected with probability ~1 and freeze the cloud.
 %     .LocalScaleFn @(row) -> 1 x numel(ScaledCols) proposal sds for one
 %                   particle (required with ScaledCols).
+%     .RidgeAtoms   (default false) when true, the random block partition
+%                   of the covariance-metric (non-scaled) mutated columns
+%                   keeps each group in .AtomGroups indivisible -- all
+%                   members of an atom always land in the same MH block
+%                   -- instead of a fully free randperm.  Default false
+%                   reproduces today's partition exactly (same randperm
+%                   call, same RNG draws).
+%     .AtomGroups   cell array of absolute theta-column-index vectors,
+%                   one per atom, used only when RidgeAtoms is true.
+%                   Members not among the mutated covariance columns, or
+%                   atoms left with fewer than 2 present members, are
+%                   silently dropped (see jointstar.blockPartition).
 %     .Verbose      print per-stage line (default true)
 %
 %   out (struct): particles (N x d), logw, weights (normalised), loglik,
 %   logprior, stages (table: stage, phi, ESS pre/post, acceptance,
-%   wall-clock, parameter means), seed, logZ (log marginal-likelihood
-%   estimate from the tempering identity).
+%   wall-clock, lml_inc, parameter means), seed, logZ and lml (identical;
+%   cumulative log marginal-likelihood estimate from the tempering
+%   identity -- lml is the documented name, logZ kept for compatibility).
 %
 %   Reproducibility: rng(opts.Seed) at entry; all proposal noise and
 %   acceptance uniforms are pre-generated on the client so results are
@@ -114,8 +127,11 @@ while phi < 1 && stage < o.MaxStages
     phiNew = nextPhi(logw, ll, phi, o.ESSTargetFrac * N);
     incr = (phiNew - phi) * ll;
     incr(isnan(incr)) = -Inf;
-    % log-marginal-likelihood increment before renormalising
-    logZ = logZ + logSumExpW(logw, incr);
+    % log-marginal-likelihood increment before renormalising: log of the
+    % weighted mean of exp((phi_t - phi_{t-1}) * loglik) under the
+    % pre-stage normalised weights, log-sum-exp stabilised
+    lmlInc = logSumExpW(logw, incr);
+    logZ = logZ + lmlInc;
     logw = logw + incr;
     phi = phiNew;
     essPost = essOf(logw);
@@ -148,8 +164,8 @@ while phi < 1 && stage < o.MaxStages
 
     nB = o.NBlocks;
     if isempty(nB), nB = max(1, ceil(dm / 40)); end
-    bperm = randperm(dm);
-    edgesB = round(linspace(0, dm, nB + 1));
+    [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB, ...
+        o.RidgeAtoms, o.AtomGroups);
     mut = struct();
     mut.M = o.MSteps;
     mut.covBlocks = cell(1, nB); mut.covLprops = cell(1, nB);
@@ -216,7 +232,7 @@ while phi < 1 && stage < o.MaxStages
     wc = toc(tStage);
     W = normW(logw);
     pm = W' * P;
-    stageRows{end + 1} = [stage, phi, essPre, essPost, accRate, wc, pm]; %#ok<AGROW>
+    stageRows{end + 1} = [stage, phi, essPre, essPost, accRate, wc, lmlInc, pm]; %#ok<AGROW>
     if o.Verbose
         fprintf('  stage %3d  phi=%.5f  ESS %6.0f->%6.0f  acc=%.2f  %.1fs\n', ...
             stage, phi, essPre, essPost, accRate, wc);
@@ -239,9 +255,15 @@ if ~isempty(o.SaveDir)
     snapshot(o.SaveDir, stage, P, logw, ll, lp, phi, o.Seed);
 end
 
+wallclock = toc(tStart);
+if o.Verbose
+    fprintf('SMC done: %d stages, %.1f s wall-clock, total LML = %.4f\n', ...
+        stage, wallclock, logZ);
+end
+
 out = struct('particles', P, 'logw', logw, 'weights', normW(logw), ...
     'loglik', ll, 'logprior', lp, 'stages', stages, 'seed', o.Seed, ...
-    'logZ', logZ, 'wallclock', toc(tStart), 'paramNames', {names});
+    'logZ', logZ, 'lml', logZ, 'wallclock', wallclock, 'paramNames', {names});
 end
 
 % ======================================================================
@@ -250,7 +272,8 @@ def = struct('NParticles', 1000, 'MSteps', 4, 'ESSTargetFrac', 0.5, ...
     'Seed', 42, 'MaxStages', 200, 'LogFile', '', 'LogAppend', false, ...
     'SaveDir', '', 'SaveEvery', 5, 'UseParallel', [], ...
     'ExtraMutate', [], 'MutateIdx', [], 'NBlocks', [], ...
-    'ScaleInit', 1, 'ScaledCols', [], 'LocalScaleFn', [], 'Verbose', true);
+    'ScaleInit', 1, 'ScaledCols', [], 'LocalScaleFn', [], 'Verbose', true, ...
+    'RidgeAtoms', false, 'AtomGroups', {{}});
 o = def;
 fn = fieldnames(opts);
 for k = 1:numel(fn), o.(fn{k}) = opts.(fn{k}); end
@@ -346,7 +369,7 @@ end
 
 function tbl = stageTable(rows, names)
 Mrows = vertcat(rows{:});
-base = {'stage', 'phi', 'ess_pre', 'ess_post', 'acc_rate', 'wallclock_s'};
+base = {'stage', 'phi', 'ess_pre', 'ess_post', 'acc_rate', 'wallclock_s', 'lml_inc'};
 cols = [base, strcat('mean_', names)];
 tbl = array2table(Mrows, 'VariableNames', cols);
 end
