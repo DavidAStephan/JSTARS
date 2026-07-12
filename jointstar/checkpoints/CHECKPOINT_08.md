@@ -21,6 +21,15 @@ required content:
 3. **Trend comparison.** NAIRU profile matches the baseline chart; end-of-
    sample r* = 0.97% [−1.9, 3.6] vs baseline ~1%; output gap +0.4% at end,
    COVID trough consistent with the baseline's −7.5%.
+   <!-- CORRECTION 2026-07-12: the last clause is wrong. The saved cp7b
+   smoothed states show OUR output-gap COVID trough at only −0.71%
+   (2020Q2, band to −2.46), NOT −7.5%. The baseline's trough is −7.5%;
+   ours is near-zero BY DESIGN — the COVID variance-inflation (kappas)
+   and level shifters absorb the 2020 collapse as a transitory measured
+   shock rather than a gap movement. This is a genuine, explainable
+   divergence from the baseline, not a match. See
+   results/figures/latent_states_comparison.png. -->
+
 4. **Horseshoe diagnostic.** ~17 of 106 off-diagonals identified;
    measurement and cross blocks mostly empty; correlations concentrated
    among trend and drift shocks. Heatmaps in `results/cp7b/figures/`.

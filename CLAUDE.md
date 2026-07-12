@@ -97,10 +97,20 @@ code yourself — delegate it to the appropriate sub-agent below.
   nests exactly inside the full `'Horseshoe', true, 'HierKappa', true`
   spec — identity off-diagonal factors reproduce it exactly. Useful as
   a regression/sensitivity check after touching the covariance layer.
-- **Final/production spec call**: `jointstar.estimate('data.csv',
-  'NParticles', 2000, 'Seed', 42, 'Horseshoe', true, 'HierKappa',
-  true)`. A single such call is NOT the quotable answer for structural
-  parameters — see "Convergence discipline" below.
+- **PRODUCTION COMMAND (use this)**: `jointstar.production('data.csv')`
+  — the single, no-options entry point. Runs the full spec from 3 seeds
+  (42/7/101, N=2000, MSteps=2, Horseshoe+HierKappa+PieObs, eval cache
+  on), pools them into the quotable stratified posterior, and writes
+  everything to `results/production/` (pooled_posterior.csv,
+  convergence_rhat.csv, smoothed_states.csv, validation_table3.csv).
+  Idempotent/resumable (skips seeds already computed). ~27 min/seed,
+  ~80 min cold. This bakes in the Convergence discipline below so no one
+  has to assemble the pooled recipe by hand.
+- **Low-level call** (for A/B, debugging, single-seed diagnostics):
+  `jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42,
+  'Horseshoe', true, 'HierKappa', true)`. A single such call is NOT the
+  quotable answer for structural parameters — use `production` for
+  anything reported. See "Convergence discipline" below.
 - **Performance (eval-cache, added post-CP9)**: `jointstar.estimate`
   builds a run-level static cache (`buildEvalCache`) of all
   θ-independent structure (regime groupings, triplet slot maps,
@@ -116,22 +126,36 @@ code yourself — delegate it to the appropriate sub-agent below.
   chase it with pool plumbing. Verification harness:
   `benchmarks/verifyCacheEquivalence.m` (run after touching anything
   in the likelihood path).
+- **TIMING TRAP (Opus-verified reconciliation, 2026-07-12)**: every
+  historical production-scale run (cp7b, rhat seeds, atoms runs) used
+  `'MSteps', 2` explicitly, but `estimate`'s DEFAULT is `MSteps=4` —
+  a default-settings run does twice cp7b's mutation work per stage, so
+  naive wall-clock comparisons against cp7b are confounded. Controlled
+  A/B (N=500, M=4, same seed): cache = 1.69× per median stage, 1.59×
+  full-run wall-clock (slow stages are less cache-sensitive). Stage
+  time is ~99% mutation evals (Gibbs/resample/bookkeeping < 1.5 s).
+  Cached production timings (N=2000, quiet 6-core): M=4 ≈ 45 min/seed
+  (measured); M=2 ≈ 27 min/seed predicted (band 23–30). Day-to-day
+  ambient drift is ~25% — only same-day paired A/B ratios are valid
+  evidence. The prior-rejection fraction q is NOT a stable constant
+  (fitted 0.12–0.38 across runs/stages, confounded with drift); a
+  per-stage bound-rejection counter in mhMutate would pin it if it
+  ever matters.
 - **Instrumentation (added CP9)**: every run now records per-stage
   log-marginal-likelihood (`lml_inc` in `smc_log.csv`, total in
   `out.lml`) and `jointstar.horseshoeDiag` writes a group-level τ_g
   table (`tau_group.csv`). LML noise floor: ~10 log points across seeds
   at N=2000 — single-run LML differences below that are sampler noise;
-  Bayes-factor comparisons need multi-seed LML means. A `'RidgeAtoms'`
-  option exists (glues documented ridge pairs into shared MH blocks) —
-  evaluated in CHECKPOINT_09 and left OFF by default: it improved some
-  target ridges but worsened others and did not reduce population-level
-  seed instability. Don't enable it for production runs without reading
-  CHECKPOINT_09 §5 first.
+  Bayes-factor comparisons need multi-seed LML means. (A `'RidgeAtoms'`
+  option — gluing ridge pairs into shared MH blocks — was evaluated in
+  CHECKPOINT_09, found not to reduce population-level seed instability,
+  and REMOVED in the 2026-07-12 production-consolidation pass. The
+  finding and rationale stay in CHECKPOINT_09; the code is gone.)
 - **MATLAB**: R2026a at `/Applications/MATLAB_R2026a.app/bin/matlab`
   (confirmed **not** on `PATH` — sub-agents must call the full path,
   e.g. `/Applications/MATLAB_R2026a.app/bin/matlab -batch "..."`). 6-core
   Home license, Parallel Computing Toolbox licensed (Threads pool
-  works). Tests: `runtests('tests')` from the `jointstar/` root (20
+  works). Tests: `runtests('tests')` from the `jointstar/` root (26
   tests green as of the last full run).
 
 ## Convergence discipline (read before estimating or judging any result)

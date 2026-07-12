@@ -26,15 +26,6 @@ function results = estimate(dataFile, varargin)
 %                            false reproduces the 7-observable model
 %     'UseParallel' (auto)   open/use a parpool for the mutation loop
 %     'NStateDraws' (500)    posterior state trajectories for the bands
-%     'RidgeAtoms'  (false)  keep named parameter groups ("atoms": the
-%                            gap-AR pair, each equation's AR-coefficient +
-%                            loading pair, the pre-break multiplier/shock-sd
-%                            pairs, and -- when 'HierKappa' is true -- each
-%                            COVID window's kappa(s) + shared hyperparameters)
-%                            indivisible within the MH block partition,
-%                            instead of the fully free per-stage random
-%                            partition.  Default false is behaviourally
-%                            identical to the pre-existing partition.
 %     'UseEvalCache' (true)  build a jointstar.buildEvalCache once (after
 %                            loadData/priors) and thread it through every
 %                            likelihood evaluation this run makes,
@@ -71,7 +62,6 @@ ip.addParameter('HierKappa', false);
 ip.addParameter('PieObs', true);   % pi_e as trend-inflation measurement (CP7)
 ip.addParameter('UseParallel', []);
 ip.addParameter('NStateDraws', 500);
-ip.addParameter('RidgeAtoms', false);
 ip.addParameter('UseEvalCache', true);
 ip.parse(varargin{:});
 o = ip.Results;
@@ -160,11 +150,6 @@ if isfield(P, 'hs')
         row(hsc.colTau2(hsc.groups)) .* row(hsc.colLam2)), 1e-3), 0.5);
 end
 
-opts.RidgeAtoms = o.RidgeAtoms;
-if o.RidgeAtoms
-    opts.AtomGroups = resolveRidgeAtoms(P);
-end
-
 out = jointstar.runSMC(prob, opts);
 
 summary = jointstar.diagnostics(out, true);
@@ -177,51 +162,6 @@ results = struct('smc', out, 'summary', summary, 'states', states, ...
     'dat', dat, 'priors', P);
 fprintf('done: %.1f min wall-clock, total LML = %.2f\n', ...
     out.wallclock / 60, out.lml);
-end
-
-% ======================================================================
-function atoms = resolveRidgeAtoms(P)
-% Resolve the fixed named "atom" sets (owner-approved groupings that
-% should never be split across an MH block) to absolute theta-column
-% indices, against this prior spec's names/mutateIdx.  Any name absent
-% from P.idx, or excluded from P.mutateIdx (fixed/Gibbs-owned columns),
-% is silently dropped; an atom left with < 2 present members dissolves.
-namedAtoms = { ...
-    {'phisum', 'phi2'}, ...
-    {'rhoU', 'xi1', 'xi2'}, ...
-    {'rhopr', 'theta1', 'theta2'}, ...
-    {'rhohpp', 'lam1', 'lam2'}, ...
-    {'rhok', 'chi1', 'chi2'}, ...
-    {'m84_z', 'sig_z'}, ...
-    {'m84_c', 'sig_c'}};
-
-atoms = {};
-for a = 1:numel(namedAtoms)
-    cols = [];
-    for j = 1:numel(namedAtoms{a})
-        nm = namedAtoms{a}{j};
-        if isfield(P.idx, nm) && P.mutateIdx(P.idx.(nm))
-            cols(end + 1) = P.idx.(nm); %#ok<AGROW>
-        end
-    end
-    if numel(cols) >= 2
-        atoms{end + 1} = cols; %#ok<AGROW>
-    end
-end
-
-% hierarchical-kappa atoms: one per COVID window group, derived from the
-% prior spec's own kappa bookkeeping (P.kap) rather than hardcoded columns
-if isfield(P, 'kap')
-    kap = P.kap;
-    for g = 1:kap.G
-        cols = kap.kapCols(kap.groups == g)';
-        cols = [cols, kap.lmCols(g), kap.laCols(g)]; %#ok<AGROW>
-        cols = cols(P.mutateIdx(cols));
-        if numel(cols) >= 2
-            atoms{end + 1} = cols; %#ok<AGROW>
-        end
-    end
-end
 end
 
 function ll = logLikTheta(P, tv, dat, cache)

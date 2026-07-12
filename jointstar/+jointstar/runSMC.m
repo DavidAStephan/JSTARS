@@ -63,18 +63,6 @@ function out = runSMC(prob, opts)
 %                   rejected with probability ~1 and freeze the cloud.
 %     .LocalScaleFn @(row) -> 1 x numel(ScaledCols) proposal sds for one
 %                   particle (required with ScaledCols).
-%     .RidgeAtoms   (default false) when true, the random block partition
-%                   of the covariance-metric (non-scaled) mutated columns
-%                   keeps each group in .AtomGroups indivisible -- all
-%                   members of an atom always land in the same MH block
-%                   -- instead of a fully free randperm.  Default false
-%                   reproduces today's partition exactly (same randperm
-%                   call, same RNG draws).
-%     .AtomGroups   cell array of absolute theta-column-index vectors,
-%                   one per atom, used only when RidgeAtoms is true.
-%                   Members not among the mutated covariance columns, or
-%                   atoms left with fewer than 2 present members, are
-%                   silently dropped (see jointstar.blockPartition).
 %     .Verbose      print per-stage line (default true)
 %
 %   out (struct): particles (N x d), logw, weights (normalised), loglik,
@@ -164,8 +152,7 @@ while phi < 1 && stage < o.MaxStages
 
     nB = o.NBlocks;
     if isempty(nB), nB = max(1, ceil(dm / 40)); end
-    [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB, ...
-        o.RidgeAtoms, o.AtomGroups);
+    [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB);
     mut = struct();
     mut.M = o.MSteps;
     mut.covBlocks = cell(1, nB); mut.covLprops = cell(1, nB);
@@ -272,8 +259,7 @@ def = struct('NParticles', 1000, 'MSteps', 4, 'ESSTargetFrac', 0.5, ...
     'Seed', 42, 'MaxStages', 200, 'LogFile', '', 'LogAppend', false, ...
     'SaveDir', '', 'SaveEvery', 5, 'UseParallel', [], ...
     'ExtraMutate', [], 'MutateIdx', [], 'NBlocks', [], ...
-    'ScaleInit', 1, 'ScaledCols', [], 'LocalScaleFn', [], 'Verbose', true, ...
-    'RidgeAtoms', false, 'AtomGroups', {{}});
+    'ScaleInit', 1, 'ScaledCols', [], 'LocalScaleFn', [], 'Verbose', true);
 o = def;
 fn = fieldnames(opts);
 for k = 1:numel(fn), o.(fn{k}) = opts.(fn{k}); end
