@@ -101,6 +101,21 @@ code yourself — delegate it to the appropriate sub-agent below.
   'NParticles', 2000, 'Seed', 42, 'Horseshoe', true, 'HierKappa',
   true)`. A single such call is NOT the quotable answer for structural
   parameters — see "Convergence discipline" below.
+- **Performance (eval-cache, added post-CP9)**: `jointstar.estimate`
+  builds a run-level static cache (`buildEvalCache`) of all
+  θ-independent structure (regime groupings, triplet slot maps,
+  vectorised Z/R fill indices, P1 inverse); `computeLogLik`/`ModelSpec`
+  take it as an optional trailing arg. **Bitwise-identical** results to
+  the uncached path (verified: 180-draw zero-diff, elementwise triplet
+  equality, and a full fixed-seed N=200 SMC A/B identical in every
+  non-timing output). Clean measured gain: 9.7 → 5.5 ms per full
+  likelihood pipeline (1.76×), ~1.6–1.7× on production stage time.
+  Hidden `'UseEvalCache'` option (default true) allows A/B. Parallel
+  efficiency is ~28–33% on ALL pool types (Threads/Processes/chunked)
+  — memory-bandwidth-bound on 6 cores, not a software problem; do not
+  chase it with pool plumbing. Verification harness:
+  `benchmarks/verifyCacheEquivalence.m` (run after touching anything
+  in the likelihood path).
 - **Instrumentation (added CP9)**: every run now records per-stage
   log-marginal-likelihood (`lml_inc` in `smc_log.csv`, total in
   `out.lml`) and `jointstar.horseshoeDiag` writes a group-level τ_g

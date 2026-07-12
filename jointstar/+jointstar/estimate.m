@@ -35,6 +35,17 @@ function results = estimate(dataFile, varargin)
 %                            instead of the fully free per-stage random
 %                            partition.  Default false is behaviourally
 %                            identical to the pre-existing partition.
+%     'UseEvalCache' (true)  build a jointstar.buildEvalCache once (after
+%                            loadData/priors) and thread it through every
+%                            likelihood evaluation this run makes,
+%                            eliminating theta-independent recomputation
+%                            in ModelSpec.jointstar/computeLogLik (see
+%                            those files).  Verified bit-for-bit identical
+%                            to the pre-existing (uncached) evaluator --
+%                            see benchmarks/verifyCacheEquivalence.m and
+%                            tests/testEvalCache.m.  Hidden/undocumented
+%                            escape hatch: set false only to A/B a run
+%                            against the pre-cache code path.
 %
 %   Final-specification call (all owner rulings baked in):
 %     jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42, ...
@@ -61,6 +72,7 @@ ip.addParameter('PieObs', true);   % pi_e as trend-inflation measurement (CP7)
 ip.addParameter('UseParallel', []);
 ip.addParameter('NStateDraws', 500);
 ip.addParameter('RidgeAtoms', false);
+ip.addParameter('UseEvalCache', true);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -83,6 +95,17 @@ if isempty(P)
     else
         P = jointstar.defaultPriors('HierKappa', o.HierKappa);
     end
+end
+
+% Run-level cache of everything theta-independent (regime groupings,
+% obsMask, P1^{-1}, ...); threaded through every likelihood eval this run
+% makes.  Deterministic (a fixed probe theta, no randomness) -- building
+% it does not perturb the RNG stream set by rng(o.Seed) above, so a run
+% with UseEvalCache true/false is byte-for-byte reproducible modulo the
+% likelihood evaluator itself (see benchmarks/verifyCacheEquivalence.m).
+cache = [];
+if o.UseEvalCache
+    cache = jointstar.buildEvalCache(dat, P);
 end
 
 usePar = o.UseParallel;
@@ -114,7 +137,7 @@ fprintf('jointstar.estimate: T=%d quarters, %d parameters, parallel=%d\n', ...
 prob = struct( ...
     'samplePrior', @(N) jointstar.priorSample(P, N), ...
     'logPrior', @(tv) jointstar.priorLogPdf(P, tv), ...
-    'logLik', @(tv) logLikTheta(P, tv, dat), ...
+    'logLik', @(tv) logLikTheta(P, tv, dat, cache), ...
     'paramNames', {P.names});
 
 opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
@@ -147,7 +170,7 @@ out = jointstar.runSMC(prob, opts);
 summary = jointstar.diagnostics(out, true);
 writetable(summary, fullfile(o.OutDir, 'posterior_summary.csv'));
 
-states = smoothedStates(P, out, dat, o.NStateDraws);
+states = smoothedStates(P, out, dat, o.NStateDraws, cache);
 writetable(states, fullfile(o.OutDir, 'smoothed_states.csv'));
 
 results = struct('smc', out, 'summary', summary, 'states', states, ...
@@ -201,15 +224,15 @@ if isfield(P, 'kap')
 end
 end
 
-function ll = logLikTheta(P, tv, dat)
+function ll = logLikTheta(P, tv, dat, cache)
 th = jointstar.thetaStruct(P, tv);
 if isfield(P, 'hs')
     [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
+    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
 else
-    spec = jointstar.ModelSpec.jointstar(th, dat);
+    spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
 end
-ll = jointstar.computeLogLik(spec.system(), dat.y);
+ll = jointstar.computeLogLik(spec.system(), dat.y, cache);
 end
 
 function pool = openPool()
@@ -231,9 +254,15 @@ catch err
 end
 end
 
-function tbl = smoothedStates(P, out, dat, nDraws)
+function tbl = smoothedStates(P, out, dat, nDraws, cache)
 % posterior bands for the headline latent series: resample particles by
-% weight, draw one state trajectory per resampled particle
+% weight, draw one state trajectory per resampled particle.  Threading
+% the run's eval cache through here too (Checkpoint: eval-cache pass)
+% gives these ~nDraws (default 500) re-evaluations -- each previously a
+% full from-scratch factorisation of a theta whose aux the SMC loop had
+% already discarded -- the same fast path as the main mutation loop,
+% rather than singling them out for a separate optimisation.
+if nargin < 5, cache = []; end
 [~, ix] = jointstar.ModelSpec.jointstarStates();
 N = size(out.particles, 1);
 edges = cumsum(out.weights); edges(end) = 1;
@@ -250,11 +279,11 @@ for k = 1:nDraws
     th = jointstar.thetaStruct(P, tv);
     if isfield(P, 'hs')
         [Lq, Lr] = jointstar.hsUnpack(P, tv);
-        spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
+        spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
     else
-        spec = jointstar.ModelSpec.jointstar(th, dat);
+        spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
     end
-    [ll, aux] = jointstar.computeLogLik(spec.system(), dat.y);
+    [ll, aux] = jointstar.computeLogLik(spec.system(), dat.y, cache);
     if ~isfinite(ll), continue; end
     a = jointstar.drawStates(aux);
     rstar(k, :) = 4 / (1 - th.alpha) * a(ix.gz, :) + a(ix.xi, :);

@@ -30,6 +30,8 @@ classdef ModelSpec
         A2  double = []   % m x m (x T) second-lag transition (optional)
         c   double = []   % m x 1 (or m x T) transition intercepts (optional)
         Q   double   % m x m (x T) innovation covariance, SPD
+        Quniq double = []  % m x m x nGroups unique Q slices (cache-aware path
+                           % only; parallels Q, see jointstar.buildEvalCache)
         a1  double   % m x 1 initial-state mean
         P1  double   % m x m initial-state covariance, SPD
         Z   double   % p x m (x T) observation loadings
@@ -38,6 +40,8 @@ classdef ModelSpec
         Rdiag double = []  % p x 1 (or p x T) measurement-error variances
         Rfull double = []  % p x p (x T) full measurement covariance (optional,
                            % used instead of Rdiag when nonempty)
+        Runiq double = []  % p x p x nGroups unique Rfull slices (cache-aware
+                           % path only; parallels Rfull)
         T   double   % number of periods
     end
 
@@ -52,9 +56,10 @@ classdef ModelSpec
         function sys = system(obj)
             %SYSTEM Return the plain struct consumed by computeLogLik.
             sys = struct('A1', obj.A1, 'A2', obj.A2, 'c', obj.c, ...
-                'Q', obj.Q, 'a1', obj.a1, 'P1', obj.P1, ...
+                'Q', obj.Q, 'Quniq', obj.Quniq, 'a1', obj.a1, 'P1', obj.P1, ...
                 'Z', obj.Z, 'Zlag', obj.Zlag, 'd', obj.d, ...
-                'Rdiag', obj.Rdiag, 'Rfull', obj.Rfull, 'T', obj.T);
+                'Rdiag', obj.Rdiag, 'Rfull', obj.Rfull, 'Runiq', obj.Runiq, ...
+                'T', obj.T);
         end
     end
 
@@ -67,14 +72,27 @@ classdef ModelSpec
             ix = cell2struct(num2cell(1:numel(names)), cn, 2);
         end
 
-        function obj = jointstar(th, dat, cf)
+        function obj = jointstar(th, dat, cf, cache)
             %JOINTSTAR Build the JointSTAR system at parameter struct th.
             %
             %   obj = jointstar.ModelSpec.jointstar(th, dat)
             %   obj = jointstar.ModelSpec.jointstar(th, dat, cf)
+            %   obj = jointstar.ModelSpec.jointstar(th, dat, cf, cache)
             %
             %   th  parameter struct (see jointstar.defaultPriors /
             %       jointstar.thetaStruct); dat from jointstar.loadData.
+            %   cache  optional struct from jointstar.buildEvalCache.  When
+            %       present, the theta-independent regime groupings for Q
+            %       (COVID-kappa / break windows) and, under the
+            %       horseshoe, Rfull are taken from the cache instead of
+            %       rediscovered via unique() every call, and only the
+            %       handful of UNIQUE slices are built (sys.Quniq /
+            %       sys.Runiq, m x m x nGroups) instead of the full dense
+            %       m x m x T array -- both a cycle and an allocation
+            %       saving (jointstar.computeLogLik consumes Quniq/Runiq
+            %       together with the same cache).  Omitted or empty =>
+            %       identical to the pre-existing behaviour (sys.Q /
+            %       sys.Rfull built as full T-slice arrays via unique()).
             %   cf  optional Cholesky-factor struct (Checkpoint 5+):
             %       cf.Lq (14x14) / cf.Lr (8x8; leading 7x7 submatrix
             %       used when the pi_e row is absent) unit lower
@@ -106,6 +124,9 @@ classdef ModelSpec
             %       z*_t = g^z_t + z*_{t-1} + eta^z) are first-order with
             %       the drift shock entering both rows, giving an exact
             %       2x2 SPD block in Q.
+            if nargin < 4, cache = []; end
+            useCache = ~isempty(cache);
+
             [~, ix] = jointstar.ModelSpec.jointstarStates();
             m = 14; T = dat.T;
             p = numel(dat.obsNames);        % 7, or 8 with the pi_e row
@@ -198,12 +219,27 @@ classdef ModelSpec
             kq(ix.Ustar, dat.pre93) = th.m93_U;
             kq(ix.c, dat.win.w2020_21) = th.kapc_2021;
 
-            Q = zeros(m, m, T);
-            [kuq, ~, iuq] = unique(kq', 'rows');
-            for uu = 1:size(kuq, 1)
-                kk = kuq(uu, :)';
-                Qu = M * (Sig0 .* (kk * kk')) * M';
-                Q(:, :, iuq == uu) = repmat((Qu + Qu') / 2, 1, 1, nnz(iuq == uu));
+            if useCache
+                % regime grouping precomputed once (buildEvalCache); build
+                % only the ~nGQ unique slices, skip the full T-slice
+                % dense array and the per-eval unique() rediscovery.
+                nGQ = cache.nGQ;
+                Q = [];
+                Quniq = zeros(m, m, nGQ);
+                for uu = 1:nGQ
+                    kk = kq(:, cache.QgroupRep(uu));
+                    Qu = M * (Sig0 .* (kk * kk')) * M';
+                    Quniq(:, :, uu) = (Qu + Qu') / 2;
+                end
+            else
+                Q = zeros(m, m, T);
+                [kuq, ~, iuq] = unique(kq', 'rows');
+                for uu = 1:size(kuq, 1)
+                    kk = kuq(uu, :)';
+                    Qu = M * (Sig0 .* (kk * kk')) * M';
+                    Q(:, :, iuq == uu) = repmat((Qu + Qu') / 2, 1, 1, nnz(iuq == uu));
+                end
+                Quniq = [];
             end
 
             % ---- measurement loadings (constant) ------------------------
@@ -264,6 +300,7 @@ classdef ModelSpec
                 sme = [sme; th.sme_pieobs];
             end
             diagR = nargin < 3 || isempty(cf);
+            Runiq = [];
             if diagR
                 Rd = s2(sme) .* s2(kr);     % fast diagonal path
                 Rfull = [];
@@ -271,13 +308,24 @@ classdef ModelSpec
                 R0 = Lr * diag(s2(sme)) * Lr';
                 R0 = (R0 + R0') / 2;
                 Rd = [];
-                Rfull = zeros(p, p, T);
-                [kur, ~, iur] = unique(kr', 'rows');
-                for uu = 1:size(kur, 1)
-                    kk = kur(uu, :)';
-                    Ru = R0 .* (kk * kk');
-                    Rfull(:, :, iur == uu) = ...
-                        repmat((Ru + Ru') / 2, 1, 1, nnz(iur == uu));
+                if useCache
+                    nGR = cache.nGR;
+                    Rfull = [];
+                    Runiq = zeros(p, p, nGR);
+                    for uu = 1:nGR
+                        kk = kr(:, cache.RgroupRep(uu));
+                        Ru = R0 .* (kk * kk');
+                        Runiq(:, :, uu) = (Ru + Ru') / 2;
+                    end
+                else
+                    Rfull = zeros(p, p, T);
+                    [kur, ~, iur] = unique(kr', 'rows');
+                    for uu = 1:size(kur, 1)
+                        kk = kur(uu, :)';
+                        Ru = R0 .* (kk * kk');
+                        Rfull(:, :, iur == uu) = ...
+                            repmat((Ru + Ru') / 2, 1, 1, nnz(iur == uu));
+                    end
                 end
             end
 
@@ -295,8 +343,8 @@ classdef ModelSpec
                 100, 0.25, 100, 0.25, 4]);
 
             obj = jointstar.ModelSpec('A1', A1, 'A2', A2, 'c', c, ...
-                'Q', Q, 'a1', a1, 'P1', P1, 'Z', Z, 'Zlag', ZL, ...
-                'd', d, 'Rdiag', Rd, 'Rfull', Rfull, 'T', T, ...
+                'Q', Q, 'Quniq', Quniq, 'a1', a1, 'P1', P1, 'Z', Z, 'Zlag', ZL, ...
+                'd', d, 'Rdiag', Rd, 'Rfull', Rfull, 'Runiq', Runiq, 'T', T, ...
                 'StateNames', jointstar.ModelSpec.jointstarStates(), ...
                 'ObsNames', string(dat.obsNames));
         end
