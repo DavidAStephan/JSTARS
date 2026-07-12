@@ -11,14 +11,14 @@ function out = profileLikelihood()
 %     3. runs the MATLAB profiler over 100 evals and reports the top-15
 %        functions by self-time
 %
-%   Run from jointstar/ root:
+%   Run from repo root:
 %     /Applications/MATLAB_R2026a.app/bin/matlab -batch "cd(pwd); addpath('benchmarks'); profileLikelihood"
 
 rng(1);
 maxNumCompThreads(1);   % single-threaded per the brief
 
 fprintf('=== building full-spec problem ===\n');
-dat = jointstar.loadData('../data.csv', 'PieObs', true);
+dat = jointstar.loadData('data.csv', 'PieObs', true);
 P = jointstar.horseshoePriors('HierKappa', true);
 fprintf('dat.T=%d, p=%d obs, P.d=%d params\n', dat.T, numel(dat.obsNames), P.d);
 

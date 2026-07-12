@@ -19,11 +19,15 @@ machine are set *when you call* `estimate`, not inside it.
 ## What you set per machine — at the call site, not in the file
 
 ```matlab
-cd jointstar; startup            % add paths, set RNG
+startup                          % run from the repo root; adds paths, sets RNG
 
 % (optional) size the pool yourself before calling, e.g. on a 32-core box:
 parpool('Threads', 32);           % estimate reuses an existing pool
 
+% the production command (3 seeds pooled, all settings baked in):
+out = jointstar.production('C:\path\to\your_data.csv');
+
+% or a single low-level run for A/B / diagnostics:
 results = jointstar.estimate('C:\path\to\your_data.csv', ...
     'NParticles', 2000, 'Seed', 42, ...
     'Horseshoe', true, 'HierKappa', true);

@@ -5,11 +5,11 @@ function out = profileParallel()
 %   dat/P/spec closures broadcast). Read-only profiling; does not touch
 %   +jointstar.
 %
-%   Run from jointstar/ root.
+%   Run from repo root.
 
 rng(1);
 
-dat = jointstar.loadData('../data.csv', 'PieObs', true);
+dat = jointstar.loadData('data.csv', 'PieObs', true);
 P = jointstar.horseshoePriors('HierKappa', true);
 
 N = 2000;

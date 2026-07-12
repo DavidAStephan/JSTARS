@@ -31,11 +31,9 @@ function out = production(dataFile)
 %   pass -- only the missing seeds are (re-)computed).
 %
 %   outRoot defaults to 'results/production' relative to the current
-%   directory, so the normal invocation, jointstar.production('../data.csv')
-%   run from the jointstar/ directory, writes to jointstar/results/production/.
-%   (Deliberately NOT derived from fileparts(dataFile): dataFile is
-%   typically a relative path like '../data.csv', whose fileparts would
-%   point outRoot outside the jointstar/ tree; 'results/production'
+%   directory, so the normal invocation, jointstar.production('data.csv')
+%   run from the repo root, writes to results/production/.
+%   (Deliberately NOT derived from fileparts(dataFile): 'results/production'
 %   relative to cwd is the same convention jointstar.estimate's own
 %   default 'OutDir' = 'results' already uses.)
 %

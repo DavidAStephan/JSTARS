@@ -68,7 +68,7 @@ classdef testHorseshoeSMC < matlab.unittest.TestCase
         function ldlRefactorMatchesCheckpoint4(tc)
             % identity factors must reproduce the diagonal-model likelihood
             dat = jointstar.loadData(fullfile(fileparts(fileparts( ...
-                mfilename('fullpath'))), '..', 'data.csv'));
+                mfilename('fullpath'))), 'data.csv'));
             P0 = jointstar.defaultPriors();
             th = jointstar.thetaStruct(P0, [P0.params.init]);
             ll0 = jointstar.computeLogLik( ...

@@ -4,10 +4,10 @@
 
 # MCMC/SMC particle-cloud snapshots — large, binary, regenerable via
 # jointstar.estimate(...). Keep the derived CSVs/figures/summaries.
-jointstar/results/**/particles_stage_*.mat
+results/**/particles_stage_*.mat
 
 # throwaway smoke-test output directories
-jointstar/results/smoke*/
+results/smoke*/
 
 # source documents (project brief, model transcription, baseline
 # parameter table, baseline trend charts) — kept locally, not tracked

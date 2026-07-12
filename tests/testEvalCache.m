@@ -13,7 +13,7 @@ classdef testEvalCache < matlab.unittest.TestCase
 
     properties (Constant)
         DataFile = fullfile(fileparts(fileparts(mfilename('fullpath'))), ...
-            '..', 'data.csv')
+            'data.csv')
     end
 
     methods (Test)

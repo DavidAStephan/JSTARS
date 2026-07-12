@@ -12,17 +12,17 @@ function out = verifyCacheEquivalence()
 %   cache correctly keys off the run's actual data/config rather than
 %   being hardcoded to the 8-observable production spec.
 %
-%   Target: exactly 0 everywhere.  Run from jointstar/ root:
+%   Target: exactly 0 everywhere.  Run from repo root:
 %     /Applications/MATLAB_R2026a.app/bin/matlab -batch ...
 %       "cd(pwd); addpath('benchmarks'); verifyCacheEquivalence"
 
 fprintf('=== eval-cache bitwise equivalence: PieObs=true (8 obs) ===\n');
-dat8 = jointstar.loadData('../data.csv', 'PieObs', true);
+dat8 = jointstar.loadData('data.csv', 'PieObs', true);
 r1 = checkFamily(dat8, jointstar.horseshoePriors('HierKappa', true), 100, 1, 'horseshoe+HierKappa');
 r2 = checkFamily(dat8, jointstar.defaultPriors(), 50, 2, 'default');
 
 fprintf('\n=== eval-cache bitwise equivalence: PieObs=false (7 obs) ===\n');
-dat7 = jointstar.loadData('../data.csv', 'PieObs', false);
+dat7 = jointstar.loadData('data.csv', 'PieObs', false);
 r3 = checkFamily(dat7, jointstar.horseshoePriors('HierKappa', true), 30, 3, 'horseshoe+HierKappa, 7obs');
 
 allMax = max([r1.maxAbsDiff, r2.maxAbsDiff, r3.maxAbsDiff]);

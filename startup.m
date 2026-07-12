@@ -5,7 +5,7 @@ function startup(nWorkers)
 %   startup(8)       also opens a local parpool with 8 workers (requires
 %                    Parallel Computing Toolbox; silently skipped if absent)
 %
-%   Run from the jointstar root.  Tests: runtests('tests').
+%   Run from the repo root.  Tests: runtests('tests').
 
 root = fileparts(mfilename('fullpath'));
 addpath(root);
