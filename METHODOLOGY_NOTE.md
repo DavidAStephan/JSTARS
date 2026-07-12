@@ -2,7 +2,7 @@
 
 ## What we're actually combining
 
-The estimation approach used in `jointstar2` (and inherited by `jointstar_lm`) combines two
+The estimation approach used in `jointstar` (and inherited by `jointstar_lm`) combines two
 methodological ingredients that come from **separate literatures and are not, as far as we can
 tell, combined this way in any published paper**. Worth being explicit about this — both for
 accurate citation in any write-up, and so nobody assumes we're just implementing an existing
