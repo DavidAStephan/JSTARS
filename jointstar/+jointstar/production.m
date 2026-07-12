@@ -12,6 +12,16 @@ function out = production(dataFile)
 %   a single seed is not.  jointstar.production is that pooled recipe,
 %   run to completion, in one call.
 %
+%   HEADLINE OUTPUT: the pooled coefficient table (posterior
+%   mean/sd/q05/q50/q95 per structural parameter, ~405 rows), returned
+%   as out.coefficients and written to results/production/
+%   pooled_posterior.csv.  This is accompanied by the cross-seed Rhat
+%   convergence table and the pooled smoothed latent-state bands. This
+%   function does NOT run Table-3 validation against the in-house
+%   baseline -- jointstar.validate remains available as a dormant
+%   standalone tool for that comparison, it is just not part of this
+%   pipeline.
+%
 %   For each seed in [42, 7, 101] this runs
 %       jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
 %           'Seed', s, 'Horseshoe', true, 'HierKappa', true, ...
@@ -63,12 +73,11 @@ function out = production(dataFile)
 %   stratified pool -- it is NOT identical to re-quantiling a pooled
 %   draw sample, which this codebase does not currently retain.
 %
-%   Finally it runs jointstar.validate on the seed-42 run (the
-%   long-standing single-cloud reference validate.m expects) and saves
-%     results/production/validation_table3.csv
-%
-%   Returns a struct with fields: seeds, pooledFile, rhatFile,
-%   statesFile, maxRhat, overlapCount.
+%   Returns a struct with fields: seeds, pooledFile, coefficients,
+%   rhatFile, statesFile, maxRhat.  out.coefficients is pooled_posterior.csv
+%   read back in as a MATLAB table (columns param, mean, sd, q05, q50,
+%   q95) -- just type out.coefficients to view the pooled coefficient
+%   table directly.
 %
 %   Cost: ~27 min/seed at MSteps=2, N=2000 -- about 80 minutes
 %   wall-clock the first time all three seeds are missing.  Effectively
@@ -113,22 +122,18 @@ fprintf('jointstar.production: max Rhat = %.3f, %d params with Rhat > 1.1\n', ..
 statesFile = fullfile(outRoot, 'smoothed_states.csv');
 poolStatesLocal(seedDirs, statesFile);
 
-% ---- Table-3 validation on the seed-42 run ---------------------------
-valFile = fullfile(outRoot, 'validation_table3.csv');
-valTbl = jointstar.validate(seedDirs{1}, P);
-writetable(valTbl, valFile);
-overlapCount = sum(valTbl.ci_overlap);
-fprintf('jointstar.production: Table-3 CI-overlap %d/%d\n', overlapCount, height(valTbl));
+% ---- headline output: pooled coefficient table ------------------------
+coefficients = readtable(pooledFile);
 
-out = struct('seeds', seeds, 'pooledFile', pooledFile, 'rhatFile', rhatFile, ...
-    'statesFile', statesFile, 'maxRhat', maxRhat, 'overlapCount', overlapCount);
+out = struct('seeds', seeds, 'pooledFile', pooledFile, 'coefficients', coefficients, ...
+    'rhatFile', rhatFile, 'statesFile', statesFile, 'maxRhat', maxRhat);
 
-fprintf(['\njointstar.production done. Quotable outputs in %s:\n' ...
-    '  pooled_posterior.csv     3-seed stratified posterior (mean/sd/q05/q50/q95)\n' ...
-    '  convergence_rhat.csv     cross-seed Rhat (max %.3f, %d params > 1.1)\n' ...
-    '  smoothed_states.csv      pooled latent-state bands\n' ...
-    '  validation_table3.csv    %d/%d CI-overlap vs baseline Table 3\n'], ...
-    outRoot, maxRhat, nOver, overlapCount, height(valTbl));
+fprintf('\njointstar.production done. Pooled coefficient table: %d parameters -> %s\n', ...
+    height(coefficients), pooledFile);
+disp(coefficients);
+fprintf('Cross-seed Rhat: max %.3f, %d params with Rhat > 1.1 (%s)\n', ...
+    maxRhat, nOver, rhatFile);
+fprintf('Pooled smoothed states: %s\n', statesFile);
 end
 
 % ======================================================================

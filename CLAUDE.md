@@ -101,11 +101,14 @@ code yourself — delegate it to the appropriate sub-agent below.
   — the single, no-options entry point. Runs the full spec from 3 seeds
   (42/7/101, N=2000, MSteps=2, Horseshoe+HierKappa+PieObs, eval cache
   on), pools them into the quotable stratified posterior, and writes
-  everything to `results/production/` (pooled_posterior.csv,
-  convergence_rhat.csv, smoothed_states.csv, validation_table3.csv).
+  everything to `results/production/`: the **coefficient table**
+  (pooled_posterior.csv — param, mean, sd, 5/50/95%; also returned as
+  `out.coefficients`), convergence_rhat.csv, and smoothed_states.csv.
   Idempotent/resumable (skips seeds already computed). ~27 min/seed,
   ~80 min cold. This bakes in the Convergence discipline below so no one
-  has to assemble the pooled recipe by hand.
+  has to assemble the pooled recipe by hand. (Table-3-vs-baseline
+  validation was removed from the production flow per owner request;
+  `jointstar.validate` still exists as a dormant standalone tool.)
 - **Low-level call** (for A/B, debugging, single-seed diagnostics):
   `jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42,
   'Horseshoe', true, 'HierKappa', true)`. A single such call is NOT the
