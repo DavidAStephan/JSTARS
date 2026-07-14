@@ -58,11 +58,18 @@ if isfield(P, 'hs')
     t2i = tau2(:, hs.groups);
     % Initial L are drawn CONSISTENT with each particle's own scales but
     % capped at sd 0.3, so no particle starts with a huge off-diagonal.
-    % This underdisperses the initial cloud relative to the prior (a
-    % deliberate initialisation approximation -- every subsequent density
-    % evaluation is exact, and the resample-move stages restore the
-    % correct spread); starting exactly from the heavy-tailed prior
-    % strands most particles in regions no MH step can leave.
+    % This underdisperses the initial cloud relative to the prior -- a
+    % deliberate initialisation approximation. Honest status (see
+    % checkpoints/CHECKPOINT_10.md, audit item 3): the phi=0 cloud is
+    % then NOT a prior sample, so the SMC exact-validity argument does
+    % not hold as stated; the imprint is a bias that decays with
+    % mutation effort (each MH stage is invariant for its tempered
+    % target) but is not exactly zero at phi=1, and the prior's far
+    % tail cannot be recovered by reweighting. It also makes out.lml a
+    % first-order-biased estimate of the marginal likelihood -- treat
+    % logZ as an internal diagnostic only. Rationale for keeping it:
+    % starting exactly from the heavy-tailed prior strands most
+    % particles in numerically non-PD regions no MH step can leave.
     sL = min(sqrt(t2i .* lam2), 0.3);
     Theta(:, hs.colL) = sL .* randn(N, nL);
     Theta(:, hs.colLam2) = lam2;

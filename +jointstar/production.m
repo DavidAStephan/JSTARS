@@ -8,8 +8,9 @@ function out = production(dataFile)
 %   CLAUDE.md "Final/production spec call" and "Owner rulings").  Per
 %   CLAUDE.md's Convergence discipline, this model's structural
 %   parameters are NOT seed-stable in a single SMC run: >=3 independent
-%   seeds pooled into one stratified posterior is the quotable answer,
-%   a single seed is not.  jointstar.production is that pooled recipe,
+%   seeds pooled into one equal-weight mixture (an inter-seed
+%   uncertainty envelope; see CHECKPOINT_10) is what gets reported,
+%   never a single seed.  jointstar.production is that pooled recipe,
 %   run to completion, in one call.
 %
 %   HEADLINE OUTPUT: the pooled coefficient table (posterior
@@ -39,12 +40,17 @@ function out = production(dataFile)
 %
 %   Once all three seeds are estimated, this reuses:
 %     - the exact pooling math in benchmarks/poolRuns.m (equal-weight,
-%       1/3 each, stratified mixture of the seeds' final phi=1 particle
-%       clouds), replicated below as a local subfunction rather than
-%       depended on as a script, writing
+%       1/3 each, mixture of the seeds' final phi=1 particle clouds),
+%       replicated below as a local subfunction rather than depended on
+%       as a script, writing
 %         results/production/pooled_posterior.csv
-%       (columns: param, mean, sd, q05, q50, q95) -- THE quotable
-%       structural-parameter table.
+%       (columns: param, mean, sd, q05, q50, q95) -- the reported
+%       structural-parameter table. Per the CHECKPOINT_10 math audit,
+%       read this as an INTER-SEED UNCERTAINTY ENVELOPE, not a
+%       converged posterior: pooling averages seed noise but does not
+%       remove the shared finite-N/mixing bias, and where all seeds
+%       jointly miss posterior mass the pooled intervals can still be
+%       too narrow. It is preferable to any single seed for reporting.
 %     - the exact Gelman-style Rhat formula in
 %       benchmarks/runConvergenceCheck.m (Rhat = sqrt(1 + B/W), B the
 %       between-seed variance of the weighted posterior means, W the
@@ -53,8 +59,8 @@ function out = production(dataFile)
 %         results/production/convergence_rhat.csv
 %       Expect several parameters with Rhat > 1.1: this model's
 %       structural params are known seed-unstable (long likelihood
-%       ridges, not a sampler bug) -- that instability is precisely why
-%       the pooled table above, not any single seed, is the answer.
+%       ridges, not a sampler bug) -- which is why the pooled envelope,
+%       not any single seed, is what gets reported.
 %
 %   It also pools the smoothed latent-state bands into
 %     results/production/smoothed_states.csv

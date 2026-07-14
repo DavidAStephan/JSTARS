@@ -1,8 +1,13 @@
-% Pool the independent-seed SMC runs into one stratified posterior.
-% Each run is a valid (equally-weighted) importance approximation of the
-% same posterior, so their equal-weight mixture is too -- and the
-% between-run disagreement that Rhat flags becomes honest within-pool
-% spread instead of being hidden inside any single run's too-tight cloud.
+% Pool the independent-seed SMC runs into one equal-weight mixture.
+% What this is (per the CHECKPOINT_10 math audit): an inter-seed-
+% uncertainty envelope, NOT a converged posterior. Each run is a
+% consistent-as-N-grows but finite-N-biased approximation; pooling
+% averages seed noise (variance/3) but does NOT remove the shared
+% finite-N/mixing bias. With cross-seed Rhat ~5 on ridge parameters the
+% seeds explore different ridge sub-regions, so the pool honestly
+% widens intervals where seeds disagree -- but it can still be too
+% narrow on any dimension all seeds jointly miss. Preferable to any
+% single seed for reporting; not a substitute for better ridge mixing.
 
 dirs = {'results/cp7b', 'results/rhat_seed7', 'results/rhat_seed101'};
 P = jointstar.horseshoePriors('HierKappa', true);
