@@ -49,6 +49,22 @@ function out = runSMC(prob, opts)
 %                   (default 1).  c adapts across stages toward ~25%
 %                   acceptance (halved below 10%, grown above 35%).
 %     .Verbose      print per-stage line (default true)
+%     .MutationTransform  (default false) mutate in elementwise-
+%                   transformed coordinates eta = T(theta) (log / logit
+%                   / shifted-log per prior support; see
+%                   jointstar.paramTransform) instead of raw theta.
+%                   Posterior-invariant: the MH accept ratio includes the
+%                   Jacobian difference (jointstar.mhMutate).  Requires
+%                   prob.priors (the jointstar.defaultPriors struct).
+%                   DEFAULT FALSE reproduces the exact prior code path
+%                   and RNG consumption (DESIGN_transformed_kernel.md).
+%     .StructuredBlocks   (default false) partition the mutated columns
+%                   into random ATOMS (known ridge/relation parameter
+%                   groups, jointstar.blockAtoms) instead of a per-
+%                   parameter randperm, so ridge partners are never
+%                   split across MH blocks.  Requires prob.priors.
+%                   DEFAULT FALSE reproduces the exact prior partition
+%                   (jointstar.blockPartition) and RNG consumption.
 %
 %   out (struct): particles (N x d), logw, weights (normalised), loglik,
 %   logprior, stages (table: stage, phi, ESS pre/post, acceptance,
@@ -85,6 +101,29 @@ logZ = 0;
 cScale = o.ScaleInit;
 stageRows = {};
 tStart = tic;
+
+% ---- transformed-kernel / structured-blocking setup (both default off,
+% in which case this whole block is inert and nothing below it runs;
+% see 'MutationTransform' / 'StructuredBlocks' above) -------------------
+kernelT = [];
+kernelAtoms = {};
+if o.MutationTransform || o.StructuredBlocks
+    if ~isfield(prob, 'priors') || isempty(prob.priors)
+        error('jointstar:missingPriors', ...
+            ['runSMC: MutationTransform/StructuredBlocks require ' ...
+             'prob.priors (the jointstar.defaultPriors struct) to ' ...
+             'build the per-parameter transform/atom spec.']);
+    end
+    kernelP = prob.priors;
+    mi0 = o.MutateIdx;
+    if isempty(mi0), mi0 = true(1, d); end
+    if o.MutationTransform
+        kernelT = jointstar.paramTransform(kernelP, mi0);
+    end
+    if o.StructuredBlocks
+        kernelAtoms = jointstar.blockAtoms(kernelP, find(mi0));
+    end
+end
 
 if o.Verbose
     fprintf('SMC: N=%d, d=%d, M=%d MH steps, ESS target %.0f%%, seed %d\n', ...
@@ -128,16 +167,33 @@ while phi < 1 && stage < o.MaxStages
     covCols = find(mi);
     dm = numel(covCols);
     Pm = P(:, covCols);
-    mu = W' * Pm;
-    Pc = Pm - mu;
+    if o.MutationTransform
+        % transform FULL-WIDTH first, then restrict: kernelT's masks
+        % (cols/kind/lo/hi) index full-width theta columns, so handing
+        % it the restricted N x dm matrix would silently misalign every
+        % column past the first 'fixed' parameter (paramTransform now
+        % also asserts on input width, making any such call loud)
+        Em = kernelT.toEta(P);
+        Em = Em(:, covCols);
+        mu = W' * Em;
+        Pc = Em - mu;
+    else
+        mu = W' * Pm;
+        Pc = Pm - mu;
+    end
     Sig = (Pc .* W)' * Pc;
     Sig = (Sig + Sig') / 2 + 1e-10 * eye(dm);
 
     nB = o.NBlocks;
     if isempty(nB), nB = max(1, ceil(dm / 40)); end
-    [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB);
+    if o.StructuredBlocks
+        [bperm, edgesB] = jointstar.blockPartitionAtoms(kernelAtoms, nB);
+    else
+        [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB);
+    end
     mut = struct();
     mut.M = o.MSteps;
+    mut.transform = kernelT;
     mut.covBlocks = cell(1, nB); mut.covLprops = cell(1, nB);
     mut.covEpsRows = cell(1, nB);
     for b = 1:nB
@@ -222,7 +278,8 @@ def = struct('NParticles', 1000, 'MSteps', 4, 'ESSTargetFrac', 0.5, ...
     'Seed', 42, 'MaxStages', 200, 'LogFile', '', 'LogAppend', false, ...
     'SaveDir', '', 'SaveEvery', 5, 'UseParallel', [], ...
     'MutateIdx', [], 'NBlocks', [], ...
-    'ScaleInit', 1, 'Verbose', true);
+    'ScaleInit', 1, 'Verbose', true, ...
+    'MutationTransform', false, 'StructuredBlocks', false);
 o = def;
 fn = fieldnames(opts);
 for k = 1:numel(fn), o.(fn{k}) = opts.(fn{k}); end

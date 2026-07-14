@@ -32,6 +32,19 @@ function results = estimate(dataFile, varargin)
 %                            tests/testEvalCache.m.  Hidden/undocumented
 %                            escape hatch: set false only to A/B a run
 %                            against the pre-cache code path.
+%     'MutationTransform' (false)  mutate in elementwise-transformed
+%                            coordinates instead of raw theta (see
+%                            jointstar.paramTransform / jointstar.runSMC).
+%                            Posterior-invariant, flag-gated; DEFAULT
+%                            FALSE reproduces the exact prior code path
+%                            and RNG consumption bitwise (see
+%                            DESIGN_transformed_kernel.md).
+%     'StructuredBlocks' (false)  co-block known ridge/relation parameter
+%                            groups instead of a per-parameter randperm
+%                            partition (see jointstar.blockAtoms /
+%                            jointstar.runSMC).  Posterior-invariant,
+%                            flag-gated; DEFAULT FALSE reproduces the
+%                            exact prior partition and RNG consumption.
 %
 %   Final-specification call (all owner rulings baked in; diagonal
 %   innovation covariance -- see CLAUDE.md "Owner rulings"):
@@ -58,6 +71,8 @@ ip.addParameter('PieObs', true);   % pi_e as trend-inflation measurement (CP7)
 ip.addParameter('UseParallel', []);
 ip.addParameter('NStateDraws', 500);
 ip.addParameter('UseEvalCache', true);
+ip.addParameter('MutationTransform', false);
+ip.addParameter('StructuredBlocks', false);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -119,11 +134,14 @@ prob = struct( ...
     'samplePrior', @(N) jointstar.priorSample(P, N), ...
     'logPrior', @(tv) jointstar.priorLogPdf(P, tv), ...
     'logLik', @(tv) logLikTheta(P, tv, dat, cache), ...
-    'paramNames', {P.names});
+    'paramNames', {P.names}, ...
+    'priors', P);   % needed only by MutationTransform/StructuredBlocks
 
 opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
     'Seed', o.Seed, 'LogFile', fullfile(o.OutDir, 'smc_log.csv'), ...
-    'SaveDir', o.OutDir, 'UseParallel', usePar, 'Verbose', true);
+    'SaveDir', o.OutDir, 'UseParallel', usePar, 'Verbose', true, ...
+    'MutationTransform', o.MutationTransform, ...
+    'StructuredBlocks', o.StructuredBlocks);
 % always restrict MH to the mutable columns: 'fixed' (calibrated)
 % parameters must never be proposed
 if isfield(P, 'mutateIdx')
