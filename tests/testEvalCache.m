@@ -18,10 +18,10 @@ classdef testEvalCache < matlab.unittest.TestCase
 
     methods (Test)
 
-        function cacheMatchesNoCache_horseshoeHierKappa(tc)
+        function cacheMatchesNoCache_defaultHierKappa(tc)
             rng(41);
             dat = jointstar.loadData(tc.DataFile, 'PieObs', true);
-            P = jointstar.horseshoePriors('HierKappa', true);
+            P = jointstar.defaultPriors('HierKappa', true);
             cache = jointstar.buildEvalCache(dat, P);
 
             Theta = jointstar.priorSample(P, 12);
@@ -47,7 +47,7 @@ classdef testEvalCache < matlab.unittest.TestCase
             % assume the 8-observable production shape.
             rng(43);
             dat = jointstar.loadData(tc.DataFile, 'PieObs', false);
-            P = jointstar.horseshoePriors('HierKappa', true);
+            P = jointstar.defaultPriors('HierKappa', true);
             cache = jointstar.buildEvalCache(dat, P);
 
             tc.verifyEqual(cache.p, 7);
@@ -63,14 +63,12 @@ classdef testEvalCache < matlab.unittest.TestCase
             % silently reused against data built with the other.
             dat8 = jointstar.loadData(tc.DataFile, 'PieObs', true);
             dat7 = jointstar.loadData(tc.DataFile, 'PieObs', false);
-            P = jointstar.horseshoePriors('HierKappa', true);
+            P = jointstar.defaultPriors('HierKappa', true);
             cache8 = jointstar.buildEvalCache(dat8, P);
 
             tv = [P.params.init];
             th = jointstar.thetaStruct(P, tv);
-            [Lq, Lr] = jointstar.hsUnpack(P, tv);
-            cf = struct('Lq', Lq, 'Lr', Lr);
-            spec7 = jointstar.ModelSpec.jointstar(th, dat7, cf, cache8);
+            spec7 = jointstar.ModelSpec.jointstar(th, dat7, [], cache8);
             tc.verifyError(@() jointstar.computeLogLik(spec7.system(), dat7.y, cache8), ...
                 'jointstar:cacheMismatch');
         end
@@ -78,17 +76,15 @@ classdef testEvalCache < matlab.unittest.TestCase
         function stateDrawsMatch(tc)
             rng(44);
             dat = jointstar.loadData(tc.DataFile, 'PieObs', true);
-            P = jointstar.horseshoePriors('HierKappa', true);
+            P = jointstar.defaultPriors('HierKappa', true);
             cache = jointstar.buildEvalCache(dat, P);
 
             tv = jointstar.priorSample(P, 1);
             th = jointstar.thetaStruct(P, tv);
-            [Lq, Lr] = jointstar.hsUnpack(P, tv);
-            cf = struct('Lq', Lq, 'Lr', Lr);
 
-            spec0 = jointstar.ModelSpec.jointstar(th, dat, cf);
+            spec0 = jointstar.ModelSpec.jointstar(th, dat);
             [ll0, aux0] = jointstar.computeLogLik(spec0.system(), dat.y);
-            spec1 = jointstar.ModelSpec.jointstar(th, dat, cf, cache);
+            spec1 = jointstar.ModelSpec.jointstar(th, dat, [], cache);
             [ll1, aux1] = jointstar.computeLogLik(spec1.system(), dat.y, cache);
             tc.verifyTrue(isfinite(ll0));
             tc.verifyEqual(ll0, ll1);
@@ -106,15 +102,9 @@ classdef testEvalCache < matlab.unittest.TestCase
 
         function verifyLoglikMatches(tc, P, dat, cache, tv)
             th = jointstar.thetaStruct(P, tv);
-            if isfield(P, 'hs')
-                [Lq, Lr] = jointstar.hsUnpack(P, tv);
-                cf = struct('Lq', Lq, 'Lr', Lr);
-            else
-                cf = [];
-            end
-            spec0 = jointstar.ModelSpec.jointstar(th, dat, cf);
+            spec0 = jointstar.ModelSpec.jointstar(th, dat);
             ll0 = jointstar.computeLogLik(spec0.system(), dat.y);
-            spec1 = jointstar.ModelSpec.jointstar(th, dat, cf, cache);
+            spec1 = jointstar.ModelSpec.jointstar(th, dat, [], cache);
             ll1 = jointstar.computeLogLik(spec1.system(), dat.y, cache);
             if isnan(ll0) || isnan(ll1)
                 tc.verifyEqual(ll0, ll1);

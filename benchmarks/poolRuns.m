@@ -9,8 +9,8 @@
 % narrow on any dimension all seeds jointly miss. Preferable to any
 % single seed for reporting; not a substitute for better ridge mixing.
 
-dirs = {'results/cp7b', 'results/rhat_seed7', 'results/rhat_seed101'};
-P = jointstar.horseshoePriors('HierKappa', true);
+dirs = {'results/production/seed42', 'results/production/seed7', 'results/production/seed101'};
+P = jointstar.defaultPriors('HierKappa', true);
 allP = []; allW = [];
 for r = 1:numel(dirs)
     snaps = dir(fullfile(dirs{r}, 'particles_stage_*.mat'));
@@ -36,7 +36,7 @@ for j = 1:d
 end
 tbl = table(string(P.names(:)), mu, sd, q(:, 1), q(:, 2), q(:, 3), ...
     'VariableNames', {'param', 'mean', 'sd', 'q05', 'q50', 'q95'});
-writetable(tbl, 'results/pooled_posterior.csv');
+writetable(tbl, 'results/production/pooled_posterior.csv');
 
 sel = {'gamma1', 'gamma2', 'nu', 'phisum', 'phi2', 'xi1', 'rhoU', ...
     'rhohpp', 'sig_gz', 'sig_xi', 'sig_c', 'sme_y', 'kapy_20', 'kapu_20'};

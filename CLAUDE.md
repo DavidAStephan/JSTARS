@@ -20,9 +20,9 @@ code yourself — delegate it to the appropriate sub-agent below.
 
 - **code-auditor** (Haiku) — read-only. Greps for lag/lead
   misalignment, hardcoded magic numbers, silent NaN-drops, unit
-  mismatches, and this project's specific known bug classes (horseshoe
-  exclusion-list integrity, `mutateIdx`/`'fixed'`-prior handling,
-  sign-restriction enforcement). First-pass mechanical sweep.
+  mismatches, and this project's specific known bug classes
+  (`mutateIdx`/`'fixed'`-prior handling, sign-restriction enforcement).
+  First-pass mechanical sweep.
 - **uc-estimator** (Haiku) — runs `jointstar.estimate` (precision-based
   SMC, not a Kalman filter/MLE) for a given spec + options. Returns
   per-stage tempering diagnostics, final log-marginal-likelihood, and
@@ -34,11 +34,10 @@ code yourself — delegate it to the appropriate sub-agent below.
   stratified posterior when agreement is weak. This project's
   identification/pile-up check — see "Convergence discipline" below.
 - **diagnostics-runner** (Haiku) — runs `jointstar.diagnostics`
-  (ESS/acceptance/wall-clock + posterior summary),
-  `jointstar.horseshoeDiag` (shrinkage/identification of covariance
-  off-diagonals), and `jointstar.validate` (CI-overlap vs the in-house
-  baseline's Table 3). Reports plainly; does not judge whether a result
-  is "good."
+  (ESS/acceptance/wall-clock + posterior summary) and, if a baseline
+  comparison is wanted, `jointstar.validate` (CI-overlap vs the in-house
+  baseline's Table 3 — dormant, not in the production flow). Reports
+  plainly; does not judge whether a result is "good."
 - **spec-comparator** (Sonnet) — given two model variants' diagnostics,
   log-marginal-likelihoods, and Table-3 CI-overlap counts, writes up
   whether the added component/parameter earns its keep. Use only when
@@ -92,28 +91,29 @@ code yourself — delegate it to the appropriate sub-agent below.
   rate = `cash_rate_pa` − `pi_e`. No Consensus survey data (proprietary,
   estimated off-site) — `pi_e` is the only trend-inflation anchor
   currently in the model.
-- **Known nesting special case**: `jointstar.estimate(..., 'Horseshoe',
-  false, 'HierKappa', false)` (the CP4/CP4_rees diagonal-Q baseline)
-  nests exactly inside the full `'Horseshoe', true, 'HierKappa', true`
-  spec — identity off-diagonal factors reproduce it exactly. Useful as
-  a regression/sensitivity check after touching the covariance layer.
+- **Covariance = DIAGONAL** (as of CHECKPOINT_11, 2026-07-14). The
+  horseshoe covariance layer was dropped entirely — it was the only
+  unprecedented component, carried a bug, and didn't change the
+  headline (see CHECKPOINT_11 / METHODOLOGY_NOTE). The model is now a
+  clean assembly of standard components. There is no `'Horseshoe'`
+  option any more.
 - **PRODUCTION COMMAND (use this)**: `jointstar.production('data.csv')`
-  — the single, no-options entry point. Runs the full spec from 3 seeds
-  (42/7/101, N=2000, MSteps=2, Horseshoe+HierKappa+PieObs, eval cache
-  on), pools them into the quotable stratified posterior, and writes
-  everything to `results/production/`: the **coefficient table**
-  (pooled_posterior.csv — param, mean, sd, 5/50/95%; also returned as
-  `out.coefficients`), convergence_rhat.csv, and smoothed_states.csv.
-  Idempotent/resumable (skips seeds already computed). ~27 min/seed,
-  ~80 min cold. This bakes in the Convergence discipline below so no one
-  has to assemble the pooled recipe by hand. (Table-3-vs-baseline
-  validation was removed from the production flow per owner request;
-  `jointstar.validate` still exists as a dormant standalone tool.)
+  — the single, no-options entry point. Runs the diagonal spec from 3
+  seeds (42/7/101, N=2000, MSteps=2, HierKappa+PieObs, eval cache on),
+  pools them, and writes everything to `results/production/`: the
+  **coefficient table** (pooled_posterior.csv — param, mean, sd,
+  5/50/95%; also returned as `out.coefficients`; 79 params),
+  convergence_rhat.csv, and smoothed_states.csv. Idempotent/resumable
+  (skips seeds already computed). ~6 min/seed diagonal, ~20 min cold.
+  This bakes in the Convergence discipline below so no one has to
+  assemble the pooled recipe by hand. (Table-3-vs-baseline validation
+  was removed from the production flow; `jointstar.validate` remains as
+  a dormant standalone tool.)
 - **Low-level call** (for A/B, debugging, single-seed diagnostics):
   `jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42,
-  'Horseshoe', true, 'HierKappa', true)`. A single such call is NOT the
-  quotable answer for structural parameters — use `production` for
-  anything reported. See "Convergence discipline" below.
+  'HierKappa', true)`. A single such call is NOT the quotable answer
+  for structural parameters — use `production` for anything reported.
+  See "Convergence discipline" below.
 - **Performance (eval-cache, added post-CP9)**: `jointstar.estimate`
   builds a run-level static cache (`buildEvalCache`) of all
   θ-independent structure (regime groupings, triplet slot maps,
@@ -144,16 +144,18 @@ code yourself — delegate it to the appropriate sub-agent below.
   (fitted 0.12–0.38 across runs/stages, confounded with drift); a
   per-stage bound-rejection counter in mhMutate would pin it if it
   ever matters.
-- **Instrumentation (added CP9)**: every run now records per-stage
+- **Instrumentation (added CP9)**: every run records per-stage
   log-marginal-likelihood (`lml_inc` in `smc_log.csv`, total in
-  `out.lml`) and `jointstar.horseshoeDiag` writes a group-level τ_g
-  table (`tau_group.csv`). LML noise floor: ~10 log points across seeds
-  at N=2000 — single-run LML differences below that are sampler noise;
-  Bayes-factor comparisons need multi-seed LML means. (A `'RidgeAtoms'`
-  option — gluing ridge pairs into shared MH blocks — was evaluated in
-  CHECKPOINT_09, found not to reduce population-level seed instability,
-  and REMOVED in the 2026-07-12 production-consolidation pass. The
-  finding and rationale stay in CHECKPOINT_09; the code is gone.)
+  `out.lml` — an internal diagnostic, not a calibrated marginal
+  likelihood; see CHECKPOINT_10). LML noise floor ~10 log points across
+  seeds at N=2000. (The `'RidgeAtoms'` option and the
+  `jointstar.horseshoeDiag` τ_g diagnostic were removed with the
+  horseshoe layer; the RidgeAtoms finding stays in CHECKPOINT_09.)
+- **Timing note**: the eval-cache and TIMING-TRAP numbers above were
+  measured on the *horseshoe* spec (~410 params, ~27–45 min/seed). The
+  current **diagonal** model is much cheaper — ~6 min/seed, ~20 min for
+  the 3-seed pool. The eval-cache still applies and is still
+  bitwise-verified on the diagonal path.
 - **MATLAB**: R2026a at `/Applications/MATLAB_R2026a.app/bin/matlab`
   (confirmed **not** on `PATH` — sub-agents must call the full path,
   e.g. `/Applications/MATLAB_R2026a.app/bin/matlab -batch "..."`). 6-core
@@ -171,11 +173,18 @@ code yourself — delegate it to the appropriate sub-agent below.
   gap) are far more robust across seeds than the structural parameters
   are.
 - Anything that will be **quoted, compared across specs, or reported
-  as "improved"** must be checked across ≥3 independent seeds
-  (`convergence-runner`) and, when agreement is weak, pooled
-  (`jointstar/benchmarks/poolRuns.m`: an equal-weight mixture of the
-  seeds' particle clouds is a valid stratified posterior estimator —
-  the current quotable table is `jointstar/results/pooled_posterior.csv`).
+  as "improved"** must be checked across ≥3 independent seeds and, when
+  agreement is weak, pooled (an equal-weight mixture of the seeds'
+  particle clouds — an inter-seed uncertainty envelope, NOT a converged
+  posterior; see CHECKPOINT_10). `jointstar.production` does this
+  automatically; the quotable table is
+  `results/production/pooled_posterior.csv`.
+- **Dropping the horseshoe did NOT fix this** (CHECKPOINT_11): the
+  diagonal model is ~78-dim vs ~410, yet max R̂ is still ~5.8. The
+  seed-instability is the model's likelihood-ridge geometry (gap-AR
+  split, ρ_U/Okun, r* band), not the covariance layer — it is the real
+  open problem, and more particles won't cure it (reparameterization
+  might).
 - A single-seed improvement in log-marginal-likelihood or Table-3
   CI-overlap is **not sufficient evidence** of a real specification
   improvement on its own — it can just be a favorable ridge draw.
@@ -196,34 +205,34 @@ sign-off before touching it:
 
 - `sme_pieobs` (pi_e measurement-error sd) is FIXED at 0.30 (`'fixed'`
   prior type, excluded from `mutateIdx`) — not a free parameter.
-- All gap-shock cross-correlations are excluded from the horseshoe
-  (`EXCLUDE_GAP` in `horseshoePriors.m`) so the IS coefficient ν and the
-  Okun loadings aren't re-absorbed into a reduced-form shock
-  correlation.
 - φ_y, φ_u (COVID stringency loadings) are sign-restricted < 0 via
   truncated normal.
 - Trimmed-mean inflation only — no separate headline-CPI Phillips-curve
   equation, despite one appearing in the source transcription's Table 1.
+- Diagonal innovation covariance (CHECKPOINT_11). The old `EXCLUDE_GAP`
+  horseshoe ruling is now moot — with a diagonal covariance there are
+  no shock cross-correlations to exclude; ν and the Okun loadings are
+  identified structurally, as intended.
 
-## Known open issues (candidate audit/improvement targets)
+## Known open issues (candidate improvement targets)
 
-From `jointstar/checkpoints/CHECKPOINT_08.md` and
-`jointstar/docs/03_validation_vs_baseline`:
+From `checkpoints/CHECKPOINT_10.md` / `CHECKPOINT_11.md`:
 
-- 17/23 Table-3 quantities have overlapping 90% CIs vs the in-house
-  baseline; 6 do not.
-- Gap-AR "hump" shape: total persistence φ1+φ2 matches the baseline but
-  the shape differs — a likelihood ridge where the prior decides.
-- ρ_U vs. Okun-loading split disagrees with the baseline (same
-  ridge/trade-off pathology).
-- Phillips-curve slope: −0.16 (this model) vs. −0.09 (baseline) —
-  weakly identified, prior-driven.
-- r* remains the least-identified latent state (band ±2.5pp+) absent
-  any neutral-rate proxy; `pi_e` is the only trend-inflation anchor
-  available.
-- Only ~17 of 106 covariance off-diagonals are identified by the
-  horseshoe; measurement and cross blocks are essentially empty,
-  correlations concentrated in the trend/drift blocks.
+- **Seed-instability / ridge geometry (THE main one).** Max cross-seed
+  R̂ ~5.8 on structural parameters; not fixed by dropping the horseshoe.
+  The posterior lives on long likelihood ridges — the gap-AR "hump"
+  (φ1+φ2 persistence matches the baseline but the split differs), the
+  ρ_U vs. Okun-loading trade-off, and the r* band. Reparameterizing
+  these ridges is the natural next work; the ≥3-seed pool is the
+  current mitigation, not a fix.
+- Phillips-curve slope weakly identified / prior-driven (~−0.16).
+- r* is the least-identified latent state (band ±2.5pp+) absent a
+  neutral-rate proxy; `pi_e` is the only trend-inflation anchor. Would
+  extend before 1993 if a pre-1993 cash-rate history were supplied.
+- COVID-κ 2023 boundary: κ reverts to 1 from 2023Q4 (last elevated
+  quarter 2023Q3), per the brief; owner to confirm whether 2023Q4
+  should instead remain elevated (a one-line change to the window end
+  dates). See CHECKPOINT_11.
 
 ## Reasoning effort / model tier guidance
 

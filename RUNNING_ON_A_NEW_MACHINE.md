@@ -30,7 +30,7 @@ out = jointstar.production('C:\path\to\your_data.csv');
 % or a single low-level run for A/B / diagnostics:
 results = jointstar.estimate('C:\path\to\your_data.csv', ...
     'NParticles', 2000, 'Seed', 42, ...
-    'Horseshoe', true, 'HierKappa', true);
+    'HierKappa', true);
 ```
 
 - **Data path** — first argument. That's the only "input" that changes.
@@ -68,12 +68,12 @@ run **≥3 independent seeds and pool them** rather than trusting one run:
 parpool('Threads', 32);                  % open once, reused across calls
 for s = [42 7 101]
     jointstar.estimate('your_data.csv', 'Seed', s, ...
-        'OutDir', sprintf('results/seed%d', s), ...
-        'Horseshoe', true, 'HierKappa', true);
+        'OutDir', sprintf('results/production/seed%d', s), ...
+        'HierKappa', true);
 end
 % then pool + diagnose:
 %   benchmarks/runConvergenceCheck.m  (R-hat across seeds)
-%   benchmarks/poolRuns.m             (results/pooled_posterior.csv)
+%   benchmarks/poolRuns.m             (results/production/pooled_posterior.csv)
 ```
 
 Seeds are embarrassingly parallel, so three full runs still fit the

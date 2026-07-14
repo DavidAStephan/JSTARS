@@ -3,7 +3,7 @@ function out = verifyCacheEquivalence()
 %
 %   Mandatory verification for the eval-cache performance pass (see
 %   jointstar.buildEvalCache).  For 100 prior-drawn thetas (fixed seed)
-%   from horseshoePriors('HierKappa', true) plus 50 from defaultPriors,
+%   from defaultPriors('HierKappa', true) plus 50 from defaultPriors(),
 %   compares jointstar.computeLogLik's old (no-cache) and new (cache)
 %   code paths and reports the max absolute log-likelihood difference.
 %   Also compares a state draw (fixed randn stream) old vs new for 5
@@ -18,12 +18,12 @@ function out = verifyCacheEquivalence()
 
 fprintf('=== eval-cache bitwise equivalence: PieObs=true (8 obs) ===\n');
 dat8 = jointstar.loadData('data.csv', 'PieObs', true);
-r1 = checkFamily(dat8, jointstar.horseshoePriors('HierKappa', true), 100, 1, 'horseshoe+HierKappa');
+r1 = checkFamily(dat8, jointstar.defaultPriors('HierKappa', true), 100, 1, 'default+HierKappa');
 r2 = checkFamily(dat8, jointstar.defaultPriors(), 50, 2, 'default');
 
 fprintf('\n=== eval-cache bitwise equivalence: PieObs=false (7 obs) ===\n');
 dat7 = jointstar.loadData('data.csv', 'PieObs', false);
-r3 = checkFamily(dat7, jointstar.horseshoePriors('HierKappa', true), 30, 3, 'horseshoe+HierKappa, 7obs');
+r3 = checkFamily(dat7, jointstar.defaultPriors('HierKappa', true), 30, 3, 'default+HierKappa, 7obs');
 
 allMax = max([r1.maxAbsDiff, r2.maxAbsDiff, r3.maxAbsDiff]);
 allStateMax = max([r1.maxStateDiff, r2.maxStateDiff, r3.maxStateDiff]);
@@ -38,8 +38,8 @@ else
         'already-mitigated sources).\n']);
 end
 
-out = struct('horseshoeHierKappa', r1, 'defaultPriors', r2, ...
-    'horseshoeHierKappa7obs', r3, 'maxAbsDiff', allMax, 'maxStateDiff', allStateMax);
+out = struct('defaultHierKappa', r1, 'defaultPriors', r2, ...
+    'defaultHierKappa7obs', r3, 'maxAbsDiff', allMax, 'maxStateDiff', allStateMax);
 end
 
 % ==========================================================================
@@ -53,17 +53,11 @@ nChecked = 0;
 for i = 1:nDraws
     tv = jointstar.priorSample(P, 1);
     th = jointstar.thetaStruct(P, tv);
-    if isfield(P, 'hs')
-        [Lq, Lr] = jointstar.hsUnpack(P, tv);
-        cf = struct('Lq', Lq, 'Lr', Lr);
-    else
-        cf = [];
-    end
 
-    spec0 = jointstar.ModelSpec.jointstar(th, dat, cf);
+    spec0 = jointstar.ModelSpec.jointstar(th, dat);
     [ll0, aux0] = jointstar.computeLogLik(spec0.system(), dat.y);
 
-    spec1 = jointstar.ModelSpec.jointstar(th, dat, cf, cache);
+    spec1 = jointstar.ModelSpec.jointstar(th, dat, [], cache);
     [ll1, aux1] = jointstar.computeLogLik(spec1.system(), dat.y, cache);
 
     nChecked = nChecked + 1;

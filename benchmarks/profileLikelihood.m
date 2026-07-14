@@ -2,7 +2,7 @@ function out = profileLikelihood()
 %PROFILELIKELIHOOD Profiling-only script (does not modify +jointstar).
 %
 %   Builds the full-spec JointSTAR problem (loadData with PieObs,
-%   horseshoePriors('HierKappa',true), ModelSpec.jointstar) at a
+%   defaultPriors('HierKappa',true), ModelSpec.jointstar) at a
 %   prior-drawn feasible theta, then:
 %     1. times jointstar.computeLogLik end-to-end (median over 200 calls)
 %     2. breaks down the internal stages by timing a COPIED fragment of
@@ -19,7 +19,7 @@ maxNumCompThreads(1);   % single-threaded per the brief
 
 fprintf('=== building full-spec problem ===\n');
 dat = jointstar.loadData('data.csv', 'PieObs', true);
-P = jointstar.horseshoePriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true);
 fprintf('dat.T=%d, p=%d obs, P.d=%d params\n', dat.T, numel(dat.obsNames), P.d);
 
 % ---- draw a feasible theta from the prior (rejection until finite ll) --
@@ -41,8 +41,7 @@ fprintf('feasible prior-drawn theta found on attempt %d, loglik = %.3f\n', ...
     attempt, ll0);
 
 th = jointstar.thetaStruct(P, theta);
-[Lq, Lr] = jointstar.hsUnpack(P, theta);
-spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
+spec = jointstar.ModelSpec.jointstar(th, dat);
 sys = spec.system();
 y = dat.y;
 [m, T, p] = deal(size(sys.A1, 1), sys.T, size(y, 1));
@@ -68,27 +67,18 @@ for k = 1:nRep2
     logLikTheta(P, theta, dat);
     times2(k) = toc(t0);
 end
-fprintf('thetaStruct+hsUnpack+ModelSpec.jointstar+computeLogLik: median %.3f ms, mean %.3f ms\n', ...
+fprintf('thetaStruct+ModelSpec.jointstar+computeLogLik: median %.3f ms, mean %.3f ms\n', ...
     1000 * median(times2), 1000 * mean(times2));
 
 nRep3 = 200;
 times3 = zeros(nRep3, 1);
 for k = 1:nRep3
     t0 = tic;
-    spec3 = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
+    spec3 = jointstar.ModelSpec.jointstar(th, dat);
     spec3.system();
     times3(k) = toc(t0);
 end
 fprintf('ModelSpec.jointstar + system(): median %.3f ms\n', 1000 * median(times3));
-
-nRep4 = 200;
-times4 = zeros(nRep4, 1);
-for k = 1:nRep4
-    t0 = tic;
-    jointstar.hsUnpack(P, theta);
-    times4(k) = toc(t0);
-end
-fprintf('hsUnpack: median %.3f ms\n', 1000 * median(times4));
 
 nRep5 = 200;
 times5 = zeros(nRep5, 1);
@@ -132,7 +122,7 @@ printTopFunctions(pinfo, 15);
 % ==================================================================
 fprintf('\n=== (3) CACHED PATH: computeLogLik end-to-end timing (n=200) ===\n');
 cache = jointstar.buildEvalCache(dat, P);
-specC = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
+specC = jointstar.ModelSpec.jointstar(th, dat, [], cache);
 sysC = specC.system();
 timesC = zeros(nRep, 1);
 for k = 1:nRep
@@ -151,7 +141,7 @@ for k = 1:nRep2
     logLikThetaCached(P, theta, dat, cache);
     timesC2(k) = toc(t0);
 end
-fprintf('thetaStruct+hsUnpack+ModelSpec.jointstar+computeLogLik (cached): median %.3f ms, mean %.3f ms\n', ...
+fprintf('thetaStruct+ModelSpec.jointstar+computeLogLik (cached): median %.3f ms, mean %.3f ms\n', ...
     1000 * median(timesC2), 1000 * mean(timesC2));
 fprintf('speedup vs full-pipeline no-cache: %.2fx\n', median(times2) / median(timesC2));
 
@@ -174,24 +164,14 @@ end
 % ======================================================================
 function ll = logLikThetaCached(P, tv, dat, cache)
 th = jointstar.thetaStruct(P, tv);
-if isfield(P, 'hs')
-    [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
-else
-    spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
-end
+spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
 ll = jointstar.computeLogLik(spec.system(), dat.y, cache);
 end
 
 % ======================================================================
 function ll = logLikTheta(P, tv, dat)
 th = jointstar.thetaStruct(P, tv);
-if isfield(P, 'hs')
-    [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
-else
-    spec = jointstar.ModelSpec.jointstar(th, dat);
-end
+spec = jointstar.ModelSpec.jointstar(th, dat);
 ll = jointstar.computeLogLik(spec.system(), dat.y);
 end
 

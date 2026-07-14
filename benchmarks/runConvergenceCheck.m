@@ -9,21 +9,26 @@
 % the (weighted) posterior means across runs and W the mean of the
 % (weighted) posterior variances.  Rhat ~ 1 for agreement; > 1.1 flags a
 % parameter whose posterior location moves materially across seeds.
+%
+% NOTE: jointstar.production('data.csv') now computes this same 3-seed
+% Rhat internally and writes it to results/production/convergence_rhat.csv.
+% This script is kept for standalone reruns/diagnostics against the same
+% production seeds; it is otherwise redundant with the production command.
 
-seeds = [7, 101];                       % seed 42 already exists (cp7b)
-dirs = {'results/cp7b'};
+seeds = [42, 7, 101];
+dirs = {};
 for s = seeds
-    od = sprintf('results/rhat_seed%d', s);
+    od = sprintf('results/production/seed%d', s);
     if ~isfile(fullfile(od, 'posterior_summary.csv'))
         jointstar.estimate('data.csv', 'NParticles', 2000, ...
             'MSteps', 2, 'Seed', s, 'OutDir', od, ...
-            'Horseshoe', true, 'HierKappa', true, 'PieObs', true);
+            'HierKappa', true, 'PieObs', true);
     end
     dirs{end + 1} = od; %#ok<AGROW>
 end
 fprintf('=== all runs done ===\n');
 
-P = jointstar.horseshoePriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true);
 R = numel(dirs);
 mu = zeros(R, P.d); v = zeros(R, P.d);
 uniqFrac = zeros(R, 1); rstarEnd = zeros(R, 3);
@@ -46,10 +51,10 @@ ok = W > 1e-12;                          % skip the calibrated constant
 rhat = ones(1, P.d);
 rhat(ok) = sqrt(1 + B(ok) ./ W(ok));
 
-isBase = 1:P.d <= P.baseD;
+isBase = true(1, P.d);   % diagonal model: every parameter is "base" (no extension groups)
 tbl = table(string(P.names(:)), rhat(:), mu', 'VariableNames', ...
     {'param', 'rhat', 'means_by_seed'});
-writetable(splitvars(tbl), 'results/convergence_rhat.csv');
+writetable(splitvars(tbl), 'results/production/convergence_rhat.csv');
 
 fprintf('\nunique-particle fraction at phi=1 per run: ');
 fprintf('%.2f ', uniqFrac); fprintf('\n');

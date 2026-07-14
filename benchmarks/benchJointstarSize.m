@@ -5,10 +5,10 @@ function out = benchJointstarSize()
 %   benchmark was written, so it uses a synthetic-but-structurally-honest
 %   system of the documented size:
 %   m = 16 states x T = 260 quarters (stacked dimension 4160), p = 11
-%   observables, an AR(2) block (second-lag transition), a dense-ish
-%   16 x 16 innovation covariance from a unit-lower-triangular LDL'
-%   factor (the Piece 3 parameterisation), and ~35% missing observations
-%   concentrated early-sample, matching the data coverage pattern.
+%   observables, an AR(2) block (second-lag transition), a diagonal
+%   16 x 16 innovation covariance (matching the production diagonal-Q
+%   model), and ~35% missing observations concentrated early-sample,
+%   matching the data coverage pattern.
 %   Target from the brief: 50-100 ms per likelihood evaluation, 1 core.
 
 rng(1);
@@ -19,10 +19,8 @@ A1 = 0.6 * eye(m) + 0.05 * (rand(m) - 0.5) .* (rand(m) < 0.25);
 A1 = A1 * (0.95 / max(abs(eig(A1))));
 A2 = zeros(m); A2(2, 2) = -0.2;    % AR(2) cycle lag
 
-% Q = L D L' with unit-lower-triangular L (horseshoe-style off-diagonals)
-Lq = eye(m) + tril(0.1 * randn(m), -1);
-D = diag(0.1 + rand(m, 1));
-Q = Lq * D * Lq';
+% Q diagonal (production innovation covariance is diagonal, no horseshoe)
+Q = diag(0.1 + rand(m, 1));
 
 Z = zeros(p, m);
 for i = 1:p

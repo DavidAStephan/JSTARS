@@ -96,7 +96,9 @@ classdef ModelSpec
             %   cf  optional Cholesky-factor struct (Checkpoint 5+):
             %       cf.Lq (14x14) / cf.Lr (8x8; leading 7x7 submatrix
             %       used when the pi_e row is absent) unit lower
-            %       triangular from jointstar.hsUnpack.  The underlying
+            %       triangular (Checkpoint 5+ horseshoe extension, since
+            %       removed from production; not currently constructed
+            %       anywhere in this codebase).  The underlying
             %       shock covariances become Lq*diag(sig.^2)*Lq' and
             %       Lr*diag(sme.^2)*Lr'.  kappa / break multipliers scale
             %       the UNDERLYING shock sds via K*Sigma*K (for the

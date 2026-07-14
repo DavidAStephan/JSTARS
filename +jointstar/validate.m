@@ -29,8 +29,8 @@ assert(abs(S.phi - 1) < 1e-9, 'last snapshot is not the phi=1 cloud');
 w = exp(S.logw - max(S.logw)); w = w / sum(w);
 
 if isempty(P)
-    for maker = {@() jointstar.horseshoePriors('HierKappa', true), ...
-            @() jointstar.horseshoePriors(), @() jointstar.defaultPriors()}
+    for maker = {@() jointstar.defaultPriors('HierKappa', true), ...
+            @() jointstar.defaultPriors()}
         P = maker{1}();
         if P.d == size(S.P, 2), break; end
     end

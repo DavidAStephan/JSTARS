@@ -51,8 +51,8 @@ for j = 1:P.d
             % mis-wiring loud (a moved constant would otherwise drift as
             % a flat-prior free parameter).
             if x ~= q.init, lp = -Inf; return; end
-        case {'hsL', 'hsHyper', 'hkap'}
-            % handled jointly in the blocks below
+        case 'hkap'
+            % handled jointly in the hierarchical-kappa block below
         otherwise
             error('jointstar:badPrior', 'unknown prior type %s', q.type);
     end
@@ -76,34 +76,10 @@ if isfield(P, 'kap')
         - gammaln(a) - log(normc));
 end
 
-% ---- grouped-horseshoe block (Makalic-Schmidt augmentation) ------------
-% L_i | lam2_i, tau2_g ~ N(0, tau2*lam2);  lam2 | nu ~ IG(1/2, 1/nu);
-% nu ~ IG(1/2, 1);  tau2_g | xi_g ~ IG(1/2, 1/xi_g);  xi_g ~ IG(1/2, 1).
-if isfield(P, 'hs')
-    hs = P.hs;
-    Lv = tv(hs.colL)'; lam2 = tv(hs.colLam2)'; nu = tv(hs.colNu)';
-    tau2 = tv(hs.colTau2)'; xi = tv(hs.colXi)';
-    if any(lam2 <= 0) || any(nu <= 0) || any(tau2 <= 0) || any(xi <= 0)
-        lp = -Inf; return;
-    end
-    t2i = tau2(hs.groups);
-    s2 = t2i .* lam2;
-    lp = lp - 0.5 * sum(Lv.^2 ./ s2) - 0.5 * sum(log(2 * pi * s2)) ...
-        + sum(igLogPdf(lam2, 0.5, 1 ./ nu)) ...
-        + sum(igLogPdf(nu, 0.5, 1)) ...
-        + sum(igLogPdf(tau2, 0.5, 1 ./ xi)) ...
-        + sum(igLogPdf(xi, 0.5, 1));
-end
-
 % joint AR(2) stationarity of the output gap (phi1 = phisum - phi2)
 f2 = tv(P.idx.phi2); f1 = tv(P.idx.phisum) - f2;
 if ~(abs(f2) < 1 && f1 + f2 < 1 && f2 - f1 < 1)
     lp = -Inf;
 end
 if isnan(lp), lp = -Inf; end   % overflowed tails are rejections, not NaNs
-end
-
-function v = igLogPdf(x, a, b)
-% inverse-gamma(a, b) log density, vectorised (x, b same shape)
-v = a .* log(b) - gammaln(a) - (a + 1) .* log(x) - b ./ x;
 end

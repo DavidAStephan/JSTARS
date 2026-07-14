@@ -12,12 +12,7 @@ function results = estimate(dataFile, varargin)
 %     'MSteps'      (4)      MH mutation steps per stage
 %     'Seed'        (42)     RNG seed (logged, reproducible)
 %     'OutDir'      ('results')
-%     'Priors'      (auto)   defaultPriors(), or horseshoePriors() when
-%                            'Horseshoe' is true
-%     'Horseshoe'   (false)  Checkpoint 5+: LDL' innovation covariances
-%                            with grouped horseshoe priors on the
-%                            off-diagonals, Makalic-Schmidt Gibbs on the
-%                            scales between SMC stages
+%     'Priors'      (auto)   defaultPriors('HierKappa', o.HierKappa)
 %     'HierKappa'   (false)  Checkpoint 6+: hierarchical COVID-kappa
 %                            priors, Gamma(a_g, b_g)*1[kappa>=1] with
 %                            window-shared estimated hyperparameters
@@ -38,9 +33,10 @@ function results = estimate(dataFile, varargin)
 %                            escape hatch: set false only to A/B a run
 %                            against the pre-cache code path.
 %
-%   Final-specification call (all owner rulings baked in):
+%   Final-specification call (all owner rulings baked in; diagonal
+%   innovation covariance -- see CLAUDE.md "Owner rulings"):
 %     jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42, ...
-%         'Horseshoe', true, 'HierKappa', true)
+%         'HierKappa', true)
 %
 %   Outputs written to OutDir:
 %     smc_log.csv             per-stage tempering diagnostics
@@ -57,7 +53,6 @@ ip.addParameter('MSteps', 4);
 ip.addParameter('Seed', 42);
 ip.addParameter('OutDir', 'results');
 ip.addParameter('Priors', []);
-ip.addParameter('Horseshoe', false);
 ip.addParameter('HierKappa', false);
 ip.addParameter('PieObs', true);   % pi_e as trend-inflation measurement (CP7)
 ip.addParameter('UseParallel', []);
@@ -80,11 +75,7 @@ end
 dat = jointstar.loadData(dataFile, 'PieObs', o.PieObs);
 P = o.Priors;
 if isempty(P)
-    if o.Horseshoe
-        P = jointstar.horseshoePriors('HierKappa', o.HierKappa);
-    else
-        P = jointstar.defaultPriors('HierKappa', o.HierKappa);
-    end
+    P = jointstar.defaultPriors('HierKappa', o.HierKappa);
 end
 
 % Run-level cache of everything theta-independent (regime groupings,
@@ -134,20 +125,9 @@ opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
     'Seed', o.Seed, 'LogFile', fullfile(o.OutDir, 'smc_log.csv'), ...
     'SaveDir', o.OutDir, 'UseParallel', usePar, 'Verbose', true);
 % always restrict MH to the mutable columns: 'fixed' (calibrated)
-% parameters and Gibbs-owned horseshoe hypers must never be proposed
+% parameters must never be proposed
 if isfield(P, 'mutateIdx')
     opts.MutateIdx = P.mutateIdx;
-end
-if isfield(P, 'hs')
-    opts.ExtraMutate = @(Pm, lp, ll, phi) ...
-        jointstar.horseshoeMutate(Pm, lp, ll, phi, P);
-    % the L off-diagonals need per-particle proposal scales: the
-    % particle's own conditional prior sd tau_g * lambda_ij (floored so
-    % shrunk coordinates still explore, capped for sanity)
-    hsc = P.hs;
-    opts.ScaledCols = hsc.colL;
-    opts.LocalScaleFn = @(row) min(max(sqrt( ...
-        row(hsc.colTau2(hsc.groups)) .* row(hsc.colLam2)), 1e-3), 0.5);
 end
 
 out = jointstar.runSMC(prob, opts);
@@ -166,12 +146,7 @@ end
 
 function ll = logLikTheta(P, tv, dat, cache)
 th = jointstar.thetaStruct(P, tv);
-if isfield(P, 'hs')
-    [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
-else
-    spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
-end
+spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
 ll = jointstar.computeLogLik(spec.system(), dat.y, cache);
 end
 
@@ -217,12 +192,7 @@ gap = nan(nDraws, T); trinf = nan(nDraws, T);
 for k = 1:nDraws
     tv = out.particles(sel(k), :);
     th = jointstar.thetaStruct(P, tv);
-    if isfield(P, 'hs')
-        [Lq, Lr] = jointstar.hsUnpack(P, tv);
-        spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
-    else
-        spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
-    end
+    spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
     [ll, aux] = jointstar.computeLogLik(spec.system(), dat.y, cache);
     if ~isfinite(ll), continue; end
     a = jointstar.drawStates(aux);

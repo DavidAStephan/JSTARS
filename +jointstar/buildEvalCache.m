@@ -88,17 +88,12 @@ function cache = buildEvalCache(dat, P)
 %   jointstar.estimate.
 
 % ---- probe theta: prior init, with structurally-zero-at-init cells ----
-% (chi1/chi2, and every horseshoe L off-diagonal) bumped to a generic
-% nonzero value so the Htilde permutation is discovered from the full
-% (never-narrower) sparsity support.
+% (chi1/chi2) bumped to a generic nonzero value so the Htilde permutation
+% is discovered from the full (never-narrower) sparsity support.
 tv0 = [P.params.init];
 if isfield(P, 'idx')
     if isfield(P.idx, 'chi1'), tv0(P.idx.chi1) = 0.1; end
     if isfield(P.idx, 'chi2'), tv0(P.idx.chi2) = 0.1; end
-end
-hasHS = isfield(P, 'hs');
-if hasHS
-    tv0(P.hs.colL) = 0.1;
 end
 % Every break multiplier (type 'logn', class default 1.5) and every
 % COVID-kappa variance scale (type 'tgamma'/'hkap', class default 2.0)
@@ -111,12 +106,7 @@ isMult = ismember({P.params.type}, multiplierTypes);
 tv0(isMult) = 1.3 + 0.013 * (1:nnz(isMult));
 
 th0 = jointstar.thetaStruct(P, tv0);
-if hasHS
-    [Lq0, Lr0] = jointstar.hsUnpack(P, tv0);
-    cf0 = struct('Lq', Lq0, 'Lr', Lr0);
-else
-    cf0 = [];
-end
+cf0 = [];
 spec0 = jointstar.ModelSpec.jointstar(th0, dat, cf0);
 sys0 = spec0.system();
 y = dat.y;

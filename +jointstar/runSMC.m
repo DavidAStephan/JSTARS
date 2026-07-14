@@ -16,9 +16,7 @@ function out = runSMC(prob, opts)
 %   Metropolis-Hastings per particle -- random partition of the mutated
 %   columns each stage, per-block proposal covariance
 %   (c^2 * 2.38^2/d_b) * weighted cloud covariance with the scale c
-%   adapted across stages toward ~25% acceptance, plus optional
-%   per-particle scaled diagonal blocks for hierarchical coordinates
-%   (ScaledCols/LocalScaleFn).
+%   adapted across stages toward ~25% acceptance.
 %
 %   prob (struct):
 %     .samplePrior  @(N) -> N x d initial particles
@@ -37,14 +35,11 @@ function out = runSMC(prob, opts)
 %     .SaveDir      directory for particle-cloud snapshots ('' = none)
 %     .SaveEvery    snapshot cadence in stages (default 5)
 %     .UseParallel  parfor over particles (default: pool already open)
-%     .ExtraMutate  @(P, lp, ll, phi) -> [P, lp, ll]; Gibbs-within-SMC
-%                   hook applied after MH (e.g. horseshoe hyperparameters
-%                   that enter the prior but not the likelihood)
 %     .MutateIdx    logical 1 x d mask: columns updated by the MH step
 %                   (default all).  Columns outside the mask ride along
-%                   unchanged through MH and are the ExtraMutate hook's
-%                   responsibility (Gibbs-within-SMC).  The adaptive
-%                   proposal covariance is built on the masked subspace.
+%                   unchanged through MH (e.g. 'fixed'/calibrated
+%                   parameters).  The adaptive proposal covariance is
+%                   built on the masked subspace.
 %     .NBlocks      MH block count (default ceil(dm/40)).  Each MH step
 %                   proposes block-by-block over a random partition of
 %                   the mutated columns (re-drawn each stage) -- in high
@@ -53,16 +48,6 @@ function out = runSMC(prob, opts)
 %     .ScaleInit    initial proposal scale multiplier c on (2.38^2/d_b)
 %                   (default 1).  c adapts across stages toward ~25%
 %                   acceptance (halved below 10%, grown above 35%).
-%     .ScaledCols   columns proposed with PER-PARTICLE diagonal steps
-%                   instead of cloud-covariance steps: step sd =
-%                   c * LocalScaleFn(particleRow).  Use for
-%                   hierarchically-scaled coordinates (horseshoe L_ij),
-%                   where the particle's own conditional prior sd -- not
-%                   the cross-particle dispersion -- is the right metric;
-%                   cloud-scale proposals on a tight-prior particle are
-%                   rejected with probability ~1 and freeze the cloud.
-%     .LocalScaleFn @(row) -> 1 x numel(ScaledCols) proposal sds for one
-%                   particle (required with ScaledCols).
 %     .Verbose      print per-stage line (default true)
 %
 %   out (struct): particles (N x d), logw, weights (normalised), loglik,
@@ -137,12 +122,10 @@ while phi < 1 && stage < o.MaxStages
     end
 
     % ---- 4. block MH mutation with adaptive proposal covariance ------
-    % (restricted to the MutateIdx subspace; other columns are the
-    % ExtraMutate hook's responsibility)
+    % (restricted to the MutateIdx subspace)
     mi = o.MutateIdx;
     if isempty(mi), mi = true(1, d); end
-    scCols = o.ScaledCols(:)';
-    covCols = setdiff(find(mi), scCols);
+    covCols = find(mi);
     dm = numel(covCols);
     Pm = P(:, covCols);
     mu = W' * Pm;
@@ -165,24 +148,9 @@ while phi < 1 && stage < o.MaxStages
         mut.covLprops{b} = chol((cScale^2 * 2.38^2 / db) * Sb, 'lower');
         mut.covEpsRows{b} = sel;
     end
-    % per-particle scaled blocks (horseshoe L's etc.)
-    nS = numel(scCols);
-    nSB = max(1, ceil(nS / 40)) * (nS > 0);
-    sperm = randperm(nS);
-    edgesS = round(linspace(0, nS, nSB + 1));
-    mut.scBlocks = cell(1, nSB); mut.scPos = cell(1, nSB);
-    mut.scEpsRows = cell(1, nSB);
-    for b = 1:nSB
-        sel = sperm(edgesS(b) + 1:edgesS(b + 1));
-        mut.scBlocks{b} = scCols(sel);          % absolute columns
-        mut.scPos{b} = sel;                     % positions in LocalScaleFn output
-        mut.scEpsRows{b} = dm + sel;
-    end
-    mut.localScaleFn = o.LocalScaleFn;
-    mut.cScale = cScale;
-    nProp = o.MSteps * (nB + nSB);
+    nProp = o.MSteps * nB;
 
-    eps3 = randn(dm + nS, o.MSteps, N);  % pre-generated: parfor-invariant
+    eps3 = randn(dm, o.MSteps, N);  % pre-generated: parfor-invariant
     logu = log(rand(N, nProp));
     accN = zeros(N, 1);
     logLik = prob.logLik; logPrior = prob.logPrior;
@@ -208,11 +176,6 @@ while phi < 1 && stage < o.MaxStages
         cScale = max(cScale * 0.8, 1e-3);
     elseif accRate > 0.35
         cScale = min(cScale * 1.25, 3);
-    end
-
-    % ---- optional Gibbs-within-SMC hook (horseshoe etc.) --------------
-    if ~isempty(o.ExtraMutate)
-        [P, lp, ll] = o.ExtraMutate(P, lp, ll, phi);
     end
 
     % ---- diagnostics ---------------------------------------------------
@@ -258,8 +221,8 @@ function o = withDefaults(opts)
 def = struct('NParticles', 1000, 'MSteps', 4, 'ESSTargetFrac', 0.5, ...
     'Seed', 42, 'MaxStages', 200, 'LogFile', '', 'LogAppend', false, ...
     'SaveDir', '', 'SaveEvery', 5, 'UseParallel', [], ...
-    'ExtraMutate', [], 'MutateIdx', [], 'NBlocks', [], ...
-    'ScaleInit', 1, 'ScaledCols', [], 'LocalScaleFn', [], 'Verbose', true);
+    'MutateIdx', [], 'NBlocks', [], ...
+    'ScaleInit', 1, 'Verbose', true);
 o = def;
 fn = fieldnames(opts);
 for k = 1:numel(fn), o.(fn{k}) = opts.(fn{k}); end

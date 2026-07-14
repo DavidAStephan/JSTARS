@@ -25,7 +25,7 @@ function out = production(dataFile)
 %
 %   For each seed in [42, 7, 101] this runs
 %       jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
-%           'Seed', s, 'Horseshoe', true, 'HierKappa', true, ...
+%           'Seed', s, 'HierKappa', true, ...
 %           'PieObs', true, 'OutDir', <outRoot>/seed<s>)
 %   skipping any seed whose OutDir already contains posterior_summary.csv
 %   (idempotent/resumable: safe to re-run after a partial or interrupted
@@ -106,11 +106,11 @@ for k = 1:numel(seeds)
     end
     fprintf('jointstar.production: running seed %d -> %s\n', s, od);
     jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
-        'Seed', s, 'Horseshoe', true, 'HierKappa', true, ...
+        'Seed', s, 'HierKappa', true, ...
         'PieObs', true, 'OutDir', od);
 end
 
-P = jointstar.horseshoePriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true);
 
 % ---- pool posterior (benchmarks/poolRuns.m logic, replicated) ---------
 pooledFile = fullfile(outRoot, 'pooled_posterior.csv');

@@ -36,48 +36,6 @@ if isfield(P, 'kap')
     end
 end
 
-% grouped-horseshoe block: draw hypers from the Makalic-Schmidt chain
-% (xi -> tau2, nu -> lam2), then L | scales
-if isfield(P, 'hs')
-    hs = P.hs;
-    nL = numel(hs.colL); G = hs.G;
-    % The lambda/tau half-Cauchys are truncated to [0.05, 10] (lambda^2,
-    % tau^2 in [2.5e-3, 1e2]).  Upper: a Cholesky off-diagonal with
-    % prior sd 100 is absurd and untruncated tails make most initial
-    % particles numerically non-PD.  Lower: a floor of 2.5e-3 on the
-    % implied L sd is "effectively zero" for a covariance entry, keeps
-    % the shrink-vs-identify behaviour of the horseshoe, and removes
-    % razor-sharp likelihood regions where MH mutation freezes.
-    % Auxiliaries are merely overflow-clamped.
-    clS = @(x) min(max(x, 2.5e-3), 1e2);
-    clA = @(x) min(max(x, 1e-10), 1e10);
-    xi = clA(1 ./ gammaDraw(0.5 * ones(N, G)));             % IG(1/2, 1)
-    tau2 = clS((1 ./ xi) ./ gammaDraw(0.5 * ones(N, G)));   % IG(1/2, 1/xi)
-    nu = clA(1 ./ gammaDraw(0.5 * ones(N, nL)));
-    lam2 = clS((1 ./ nu) ./ gammaDraw(0.5 * ones(N, nL)));
-    t2i = tau2(:, hs.groups);
-    % Initial L are drawn CONSISTENT with each particle's own scales but
-    % capped at sd 0.3, so no particle starts with a huge off-diagonal.
-    % This underdisperses the initial cloud relative to the prior -- a
-    % deliberate initialisation approximation. Honest status (see
-    % checkpoints/CHECKPOINT_10.md, audit item 3): the phi=0 cloud is
-    % then NOT a prior sample, so the SMC exact-validity argument does
-    % not hold as stated; the imprint is a bias that decays with
-    % mutation effort (each MH stage is invariant for its tempered
-    % target) but is not exactly zero at phi=1, and the prior's far
-    % tail cannot be recovered by reweighting. It also makes out.lml a
-    % first-order-biased estimate of the marginal likelihood -- treat
-    % logZ as an internal diagnostic only. Rationale for keeping it:
-    % starting exactly from the heavy-tailed prior strands most
-    % particles in numerically non-PD regions no MH step can leave.
-    sL = min(sqrt(t2i .* lam2), 0.3);
-    Theta(:, hs.colL) = sL .* randn(N, nL);
-    Theta(:, hs.colLam2) = lam2;
-    Theta(:, hs.colNu) = nu;
-    Theta(:, hs.colTau2) = tau2;
-    Theta(:, hs.colXi) = xi;
-end
-
 % AR(2) stationarity by rejection: redraw offending (phisum, phi2) pairs
 % (phi1 = phisum - phi2)
 i1 = P.idx.phisum; i2 = P.idx.phi2;
@@ -114,8 +72,8 @@ switch q.type
             @(v) v >= q.lo, N);
     case 'fixed'
         x = repmat(q.init, N, 1);   % calibrated constant
-    case {'hsL', 'hsHyper', 'hkap'}
-        x = repmat(q.init, N, 1);   % overwritten by the joint blocks
+    case 'hkap'
+        x = repmat(q.init, N, 1);   % overwritten by the hierarchical-kappa block
     otherwise
         error('jointstar:badPrior', 'unknown prior type %s', q.type);
 end

@@ -10,7 +10,7 @@ function out = profileParallel()
 rng(1);
 
 dat = jointstar.loadData('data.csv', 'PieObs', true);
-P = jointstar.horseshoePriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true);
 
 N = 2000;
 fprintf('drawing %d particles from the prior (rejecting infeasible draws)...\n', N);
@@ -234,22 +234,12 @@ end
 
 function ll = logLikTheta(P, tv, dat)
 th = jointstar.thetaStruct(P, tv);
-if isfield(P, 'hs')
-    [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr));
-else
-    spec = jointstar.ModelSpec.jointstar(th, dat);
-end
+spec = jointstar.ModelSpec.jointstar(th, dat);
 ll = jointstar.computeLogLik(spec.system(), dat.y);
 end
 
 function ll = logLikThetaCached(P, tv, dat, cache)
 th = jointstar.thetaStruct(P, tv);
-if isfield(P, 'hs')
-    [Lq, Lr] = jointstar.hsUnpack(P, tv);
-    spec = jointstar.ModelSpec.jointstar(th, dat, struct('Lq', Lq, 'Lr', Lr), cache);
-else
-    spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
-end
+spec = jointstar.ModelSpec.jointstar(th, dat, [], cache);
 ll = jointstar.computeLogLik(spec.system(), dat.y, cache);
 end
