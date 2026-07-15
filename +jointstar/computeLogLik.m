@@ -116,7 +116,13 @@ iS = zeros(m * m * nBlk, 1); jS = iS; vS = iS;
 logdetS = 0;
 ptr = 0;
 
-[P1inv, ld] = invSPD(sys.P1, 'P1');   % P1 is fixed spec, not theta: throw
+% P1 is normally fixed-spec, not theta-dependent; under 'RateGapAR'
+% (DEFAULT FALSE) P1(xi,xi) does depend on theta but remains diagonal SPD
+% for rho_rg in (0,1), so invSPD still succeeds and throwing on failure
+% remains the right behaviour (an infeasible P1 would indicate a real bug,
+% not a rejectable draw, since rho_rg's Beta(0,1) support already
+% guarantees P1(xi,xi) > 0).
+[P1inv, ld] = invSPD(sys.P1, 'P1');
 logdetS = logdetS + ld;
 [iS, jS, vS, ptr] = putBlock(iS, jS, vS, ptr, P1inv, 0, 0);
 
@@ -337,7 +343,11 @@ if nObs == 0
     error('jointstar:noData', 'y contains no observed values.');
 end
 
-% ---- P1^{-1}: hardcoded model constant, never a function of theta -----
+% ---- P1^{-1}: usually a hardcoded model constant (theta-independent),
+% but under 'RateGapAR' (DEFAULT FALSE) P1(xi,xi) does vary with theta
+% (sig_xi, rho_rg); the isequal guard below correctly falls through to a
+% fresh inversion on (almost) every draw in that case -- not memoized,
+% but still correct (P1 stays diagonal SPD) -----------------------------
 if isequal(sys.P1, cache.P1)
     P1inv = cache.P1inv; ldP1 = cache.logdetP1;
 else

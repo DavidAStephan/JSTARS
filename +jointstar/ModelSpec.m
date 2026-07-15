@@ -138,6 +138,17 @@ classdef ModelSpec
             % prior parameterisation; phi1 is derived
             th.phi1 = th.phisum - th.phi2;
 
+            % r*-trend growth pair: under 'GTrendRotation' (checkpoint 13),
+            % theta carries (gtrend_sum, gtrend_split) instead of
+            % (gzbar, gwbar); derive the latter before ck/cz/cw are built.
+            % Mirrors the phisum/phi2 -> phi1 derivation above. Absent =>
+            % th.gzbar/th.gwbar are already the theta fields (unchanged
+            % behaviour).
+            if isfield(th, 'gtrend_sum')
+                th.gzbar = (th.gtrend_sum + th.gtrend_split) / 2;
+                th.gwbar = (th.gtrend_sum - th.gtrend_split) / 2;
+            end
+
             drift975 = 0.975; drift95 = 0.95;
             iskoef = (th.nu / 2) * (4 / (1 - th.alpha));
 
@@ -154,7 +165,18 @@ classdef ModelSpec
             A0(ix.ghpp, ix.ghpp) = drift95;
             A0(ix.prstar, ix.prstar) = 1; A0(ix.prstar, ix.gpr) = drift95;
             A0(ix.gpr, ix.gpr) = drift95;
-            A0(ix.xi, ix.xi) = 1;
+            % rate-gap AR(1) (design e4d, 'RateGapAR', DEFAULT FALSE):
+            % under isfield(th,'rho_rg'), xi becomes a stationary
+            % mean-zero AR(1) (A0=rho_rg) instead of a driftless random
+            % walk (A0=1); P1(xi,xi) below moves to the matching
+            % unconditional variance.  c(xi,:) stays 0 (mean-zero) either
+            % way. Absent 'rho_rg' => bit-identical to prior behaviour.
+            hasRateGapAR = isfield(th, 'rho_rg');
+            if hasRateGapAR
+                A0(ix.xi, ix.xi) = th.rho_rg;
+            else
+                A0(ix.xi, ix.xi) = 1;
+            end
             A0(ix.c, ix.c) = th.phi1;
 
             A1 = repmat(A0, 1, 1, T);
@@ -343,6 +365,14 @@ classdef ModelSpec
             a1(ix.ghpp) = -0.1; a1(ix.gpr) = 0.1;
             P1 = diag([25, 25, 25, 100, 0.25, 100, 0.25, 100, 0.25, ...
                 100, 0.25, 100, 0.25, 4]);
+            if hasRateGapAR
+                % stationary AR(1) unconditional variance; xi has no
+                % cross-loadings and an independent diagonal innovation
+                % (Sig0/M leave xi's row/column untouched), so this is
+                % exact -- no initial cross-covariance needed. Mirrors
+                % ModelSpec.toyAR1's own convention.
+                P1(ix.xi, ix.xi) = th.sig_xi^2 / (1 - th.rho_rg^2);
+            end
 
             obj = jointstar.ModelSpec('A1', A1, 'A2', A2, 'c', c, ...
                 'Q', Q, 'Quniq', Quniq, 'a1', a1, 'P1', P1, 'Z', Z, 'Zlag', ZL, ...

@@ -82,10 +82,8 @@ statistical methodology (see METHODOLOGY_NOTE.md).
 
 ## Still open (separate items)
 
-- **The kappa 2023-boundary question** (2023Q3 last-elevated vs the
-  owner's "after 2023Q4" phrasing) — verified the code matches the
-  brief (κ=1 from 2023Q4; 2023Q3 last elevated), robust to sample
-  extension; awaiting owner confirmation whether 2023Q4 should be
-  elevated instead (a one-line change). Not touched here.
+- **The kappa 2023-boundary question** — RESOLVED 2026-07-15: owner
+  confirmed the current cutoff (κ=1 from 2023Q4; 2023Q3 last elevated,
+  matching the brief). No code change. Now an owner ruling in CLAUDE.md.
 - **The ridge geometry / seed-instability** — the real remaining
   convergence problem, unaffected by the covariance choice.

@@ -25,11 +25,25 @@ function out = production(dataFile)
 %
 %   For each seed in [42, 7, 101] this runs
 %       jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
-%           'Seed', s, 'HierKappa', true, ...
-%           'PieObs', true, 'OutDir', <outRoot>/seed<s>)
+%           'Seed', s, 'HierKappa', true, 'PieObs', true, ...
+%           'MutationTransform', true, 'StructuredBlocks', true, ...
+%           'MStepsLadder', true, 'OutDir', <outRoot>/seed<s>)
 %   skipping any seed whose OutDir already contains posterior_summary.csv
 %   (idempotent/resumable: safe to re-run after a partial or interrupted
 %   pass -- only the missing seeds are (re-)computed).
+%
+%   The transformed-kernel trio (MutationTransform + StructuredBlocks +
+%   MStepsLadder) is the CHECKPOINT_13 convergence configuration: it
+%   cut max cross-seed Rhat from 5.82 (raw kernel) to ~2.20 by mutating
+%   in unconstrained coordinates, co-blocking the named ridge atoms, and
+%   raising the late-stage MH-step count (x2 for phi>=0.7, x3 for
+%   phi>=0.95). These change only the sampler's proposal, not the model
+%   or its parameter set, so the pooling/Rhat machinery below is
+%   unaffected. NOTE: existing results/production/ was produced by the
+%   OLD raw kernel -- delete or move it before re-running so the pooled
+%   table is regenerated under the new configuration (gamma2 and several
+%   sigma/kappa params shift; the old values were partly sticky-kernel
+%   artifacts, see CHECKPOINT_12/13).
 %
 %   outRoot defaults to 'results/production' relative to the current
 %   directory, so the normal invocation, jointstar.production('data.csv')
@@ -107,7 +121,9 @@ for k = 1:numel(seeds)
     fprintf('jointstar.production: running seed %d -> %s\n', s, od);
     jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
         'Seed', s, 'HierKappa', true, ...
-        'PieObs', true, 'OutDir', od);
+        'PieObs', true, ...
+        'MutationTransform', true, 'StructuredBlocks', true, ...
+        'MStepsLadder', true, 'OutDir', od);
 end
 
 P = jointstar.defaultPriors('HierKappa', true);

@@ -65,6 +65,19 @@ function out = runSMC(prob, opts)
 %                   split across MH blocks.  Requires prob.priors.
 %                   DEFAULT FALSE reproduces the exact prior partition
 %                   (jointstar.blockPartition) and RNG consumption.
+%     .MStepsLadder (default false) late-stage mutation-effort ladder:
+%                   make the per-stage MH sweep count M stage-dependent
+%                   instead of the constant o.MSteps. Using the
+%                   tempering exponent phi already reached BEFORE this
+%                   stage's mutation (i.e. phi_n, just set by the
+%                   adaptive-tempering step above), the effective count
+%                   is M_stage = MSteps for phi < 0.7, 2*MSteps for
+%                   0.7 <= phi < 0.95, 3*MSteps for phi >= 0.95 -- more
+%                   mutation effort exactly where ridge exploration is
+%                   hardest (late stages, phi near 1). DEFAULT FALSE
+%                   leaves M_stage == o.MSteps every stage, i.e. the
+%                   exact prior code path and RNG consumption
+%                   (eps3/logu sizes unchanged).
 %
 %   out (struct): particles (N x d), logw, weights (normalised), loglik,
 %   logprior, stages (table: stage, phi, ESS pre/post, acceptance,
@@ -191,8 +204,25 @@ while phi < 1 && stage < o.MaxStages
     else
         [bperm, edgesB] = jointstar.blockPartition(dm, covCols, nB);
     end
+    % ---- late-stage mutation-effort ladder (default off; when off,
+    % mStage == o.MSteps every stage -- identical code path/RNG
+    % consumption to before this option existed; see 'MStepsLadder'
+    % above). phi here is the tempering exponent just reached this
+    % stage, BEFORE mutation -- exactly what the design calls for.
+    if o.MStepsLadder
+        if phi >= 0.95
+            mStage = 3 * o.MSteps;
+        elseif phi >= 0.7
+            mStage = 2 * o.MSteps;
+        else
+            mStage = o.MSteps;
+        end
+    else
+        mStage = o.MSteps;
+    end
+
     mut = struct();
-    mut.M = o.MSteps;
+    mut.M = mStage;
     mut.transform = kernelT;
     mut.covBlocks = cell(1, nB); mut.covLprops = cell(1, nB);
     mut.covEpsRows = cell(1, nB);
@@ -204,9 +234,9 @@ while phi < 1 && stage < o.MaxStages
         mut.covLprops{b} = chol((cScale^2 * 2.38^2 / db) * Sb, 'lower');
         mut.covEpsRows{b} = sel;
     end
-    nProp = o.MSteps * nB;
+    nProp = mStage * nB;
 
-    eps3 = randn(dm, o.MSteps, N);  % pre-generated: parfor-invariant
+    eps3 = randn(dm, mStage, N);  % pre-generated: parfor-invariant
     logu = log(rand(N, nProp));
     accN = zeros(N, 1);
     logLik = prob.logLik; logPrior = prob.logPrior;
@@ -238,7 +268,7 @@ while phi < 1 && stage < o.MaxStages
     wc = toc(tStage);
     W = normW(logw);
     pm = W' * P;
-    stageRows{end + 1} = [stage, phi, essPre, essPost, accRate, wc, lmlInc, pm]; %#ok<AGROW>
+    stageRows{end + 1} = [stage, phi, essPre, essPost, accRate, wc, lmlInc, mStage, pm]; %#ok<AGROW>
     if o.Verbose
         fprintf('  stage %3d  phi=%.5f  ESS %6.0f->%6.0f  acc=%.2f  %.1fs\n', ...
             stage, phi, essPre, essPost, accRate, wc);
@@ -279,7 +309,8 @@ def = struct('NParticles', 1000, 'MSteps', 4, 'ESSTargetFrac', 0.5, ...
     'SaveDir', '', 'SaveEvery', 5, 'UseParallel', [], ...
     'MutateIdx', [], 'NBlocks', [], ...
     'ScaleInit', 1, 'Verbose', true, ...
-    'MutationTransform', false, 'StructuredBlocks', false);
+    'MutationTransform', false, 'StructuredBlocks', false, ...
+    'MStepsLadder', false);
 o = def;
 fn = fieldnames(opts);
 for k = 1:numel(fn), o.(fn{k}) = opts.(fn{k}); end
@@ -375,7 +406,7 @@ end
 
 function tbl = stageTable(rows, names)
 Mrows = vertcat(rows{:});
-base = {'stage', 'phi', 'ess_pre', 'ess_post', 'acc_rate', 'wallclock_s', 'lml_inc'};
+base = {'stage', 'phi', 'ess_pre', 'ess_post', 'acc_rate', 'wallclock_s', 'lml_inc', 'm_stage'};
 cols = [base, strcat('mean_', names)];
 tbl = array2table(Mrows, 'VariableNames', cols);
 end

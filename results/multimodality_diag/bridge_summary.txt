@@ -1,0 +1,44 @@
+BRIDGING LOG-POSTERIOR PROFILE -- 15-Jul-2026 19:03:34
+Sanity gate: max abs err ll=0.000e+00, lp=0.000e+00 (tol 1e-6) -- PASSED
+seed42  MAP lpost = -305.2818 (ll=-245.0167, lp=-60.2651)
+seed101 MAP lpost = -333.1816 (ll=-260.1477, lp=-73.0339)
+seed42  weighted-mean lpost = -316.8555 (ll=-257.4436, lp=-59.4118)
+seed101 weighted-mean lpost = -329.6021 (ll=-272.4369, lp=-57.1652)
+block coords [gwbar,gzbar,sig_xi] idx = [21 20 42]
+  seed42-MAP  values: 0.3368, 0.2110, 0.1360
+  seed101-MAP values: 0.6823, 0.0234, 0.2065
+
+--- Path 1: MAP-to-MAP full line ---
+  endpoint t=0 (start): lpost=-305.2818 (ll=-245.0167, lp=-60.2651)
+  endpoint t=1 (end):   lpost=-333.1816 (ll=-260.1477, lp=-73.0339)
+  minimum: lpost=-333.1816 at t=1.0000
+  dip below lower endpoint (log points): 0.0000
+  NOTE: interior hump ABOVE both endpoints: max lpost=-287.3366 at t=0.3846 (17.9452 log points above the HIGHER endpoint) -- evidence FOR connectivity, not a barrier
+  n finite / total points: 40 / 40
+  VERDICT: CONNECTED-RIDGE
+
+--- Path 2: mean-to-mean full line ---
+  endpoint t=0 (start): lpost=-316.8555 (ll=-257.4436, lp=-59.4118)
+  endpoint t=1 (end):   lpost=-329.6021 (ll=-272.4369, lp=-57.1652)
+  minimum: lpost=-329.6021 at t=1.0000
+  dip below lower endpoint (log points): 0.0000
+  NOTE: interior hump ABOVE both endpoints: max lpost=-304.8970 at t=0.3846 (11.9584 log points above the HIGHER endpoint) -- evidence FOR connectivity, not a barrier
+  n finite / total points: 40 / 40
+  VERDICT: CONNECTED-RIDGE
+
+--- Path 3: restricted block: seed42-MAP -> seed101-MAP on [gwbar,gzbar,sig_xi] ---
+  endpoint t=0 (start): lpost=-305.2818 (ll=-245.0167, lp=-60.2651)
+  endpoint t=1 (end):   lpost=-317.1807 (ll=-252.1642, lp=-65.0165)
+  minimum: lpost=-317.1807 at t=1.0000
+  dip below lower endpoint (log points): 0.0000
+  n finite / total points: 40 / 40
+  VERDICT: CONNECTED-RIDGE
+
+--- Path 4: restricted block: seed101-MAP -> seed42-MAP on [gwbar,gzbar,sig_xi] ---
+  endpoint t=0 (start): lpost=-333.1816 (ll=-260.1477, lp=-73.0339)
+  endpoint t=1 (end):   lpost=-319.9534 (ll=-251.6709, lp=-68.2825)
+  minimum: lpost=-333.1816 at t=0.0000
+  dip below lower endpoint (log points): 0.0000
+  n finite / total points: 40 / 40
+  VERDICT: CONNECTED-RIDGE
+

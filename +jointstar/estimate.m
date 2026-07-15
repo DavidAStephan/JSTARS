@@ -45,6 +45,42 @@ function results = estimate(dataFile, varargin)
 %                            jointstar.runSMC).  Posterior-invariant,
 %                            flag-gated; DEFAULT FALSE reproduces the
 %                            exact prior partition and RNG consumption.
+%     'MStepsLadder' (false) late-stage mutation-effort ladder: make the
+%                            per-stage MH step count stage-dependent,
+%                            M_stage = MSteps for phi<0.7, 2*MSteps for
+%                            0.7<=phi<0.95, 3*MSteps for phi>=0.95 (see
+%                            jointstar.runSMC).  More mutation effort
+%                            where ridge exploration is hardest (late
+%                            tempering stages).  DEFAULT FALSE leaves
+%                            M_stage == MSteps every stage -- identical
+%                            code path and RNG consumption.
+%     'GTrendRotation' (false)  reparameterise the r*-trend growth pair
+%                            (gzbar, gwbar) as (gtrend_sum, gtrend_split)
+%                            = (gzbar+gwbar, gzbar-gwbar), mirroring the
+%                            existing (phisum, phi2) gap-AR rotation (see
+%                            jointstar.defaultPriors / jointstar.ModelSpec
+%                            / jointstar.blockAtoms).  ModelSpec's
+%                            ck = 0.025*(gzbar+gwbar)/(1-alpha) means the
+%                            model mainly identifies the SUM; this puts
+%                            the RW proposal on the identified/
+%                            unidentified axes directly.  DEFAULT FALSE
+%                            emits the original gzbar/gwbar rows and
+%                            reproduces the exact prior code path.
+%     'RateGapAR'   (false)  design e4d: switch the xi state (r*_t =
+%                            4/(1-alpha)*gz_t + xi_t) from a driftless
+%                            random walk to a stationary mean-zero AR(1),
+%                            A0(xi,xi)=rho_rg (new param, Beta(9.99,1.76),
+%                            mean .85 sd .10), P1(xi,xi)=
+%                            sig_xi^2/(1-rho_rg^2) (see
+%                            jointstar.defaultPriors / jointstar.ModelSpec
+%                            / jointstar.blockAtoms, which co-blocks
+%                            rho_rg with {phisum, phi2, nu} -- it enters
+%                            the same output-gap IS equation).  Removes
+%                            the permanent-shock component the RW
+%                            contributed to the IS forcing term.  DEFAULT
+%                            FALSE => isfield(th,'rho_rg') false =>
+%                            A0(xi,xi)=1, P1(xi,xi)=4 exactly as before,
+%                            bit-identical.
 %
 %   Final-specification call (all owner rulings baked in; diagonal
 %   innovation covariance -- see CLAUDE.md "Owner rulings"):
@@ -73,6 +109,9 @@ ip.addParameter('NStateDraws', 500);
 ip.addParameter('UseEvalCache', true);
 ip.addParameter('MutationTransform', false);
 ip.addParameter('StructuredBlocks', false);
+ip.addParameter('MStepsLadder', false);
+ip.addParameter('GTrendRotation', false);
+ip.addParameter('RateGapAR', false);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -90,7 +129,8 @@ end
 dat = jointstar.loadData(dataFile, 'PieObs', o.PieObs);
 P = o.Priors;
 if isempty(P)
-    P = jointstar.defaultPriors('HierKappa', o.HierKappa);
+    P = jointstar.defaultPriors('HierKappa', o.HierKappa, ...
+        'GTrendRotation', o.GTrendRotation, 'RateGapAR', o.RateGapAR);
 end
 
 % Run-level cache of everything theta-independent (regime groupings,
@@ -141,7 +181,8 @@ opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
     'Seed', o.Seed, 'LogFile', fullfile(o.OutDir, 'smc_log.csv'), ...
     'SaveDir', o.OutDir, 'UseParallel', usePar, 'Verbose', true, ...
     'MutationTransform', o.MutationTransform, ...
-    'StructuredBlocks', o.StructuredBlocks);
+    'StructuredBlocks', o.StructuredBlocks, ...
+    'MStepsLadder', o.MStepsLadder);
 % always restrict MH to the mutable columns: 'fixed' (calibrated)
 % parameters must never be proposed
 if isfield(P, 'mutateIdx')

@@ -12,9 +12,13 @@ function atoms = blockAtoms(P, covCols)
 %   only names that actually exist in this prior spec (silent drop --
 %   e.g. a reduced spec missing a row's loading just contributes a
 %   smaller/absent atom, never an error):
-%     {phisum, phi2, nu}, {rhoU, xi1, xi2, phiu},
+%     {phisum, phi2, nu, rho_rg} (rho_rg only present under 'RateGapAR' --
+%     design e4d: it feeds the same output-gap IS equation as phi1/phi2/nu,
+%     so it is co-blocked with them rather than left as its own singleton
+%     atom on the raw kernel), {rhoU, xi1, xi2, phiu},
 %     {rhopr, theta1, theta2, phipr}, {rhohpp, lam1, lam2, phihpp},
-%     {rhok, chi1, chi2, phik}, {gzbar, gwbar}, {sig_gz, sig_gw, sig_xi}.
+%     {rhok, chi1, chi2, phik}, {gzbar, gwbar} (or, under 'GTrendRotation',
+%     {gtrend_sum, gtrend_split}), {sig_gz, sig_gw, sig_xi}.
 %
 %   The hierarchical-COVID-kappa hyper groups (present only when P was
 %   built with 'HierKappa', true) are built directly from P.kap, since
@@ -43,12 +47,13 @@ absToRel = zeros(1, d);
 absToRel(covCols) = 1:dm;
 
 atomDefs = { ...
-    {'phisum', 'phi2', 'nu'}, ...
+    {'phisum', 'phi2', 'nu', 'rho_rg'}, ... % rho_rg: 'RateGapAR' addition
     {'rhoU', 'xi1', 'xi2', 'phiu'}, ...
     {'rhopr', 'theta1', 'theta2', 'phipr'}, ...
     {'rhohpp', 'lam1', 'lam2', 'phihpp'}, ...
     {'rhok', 'chi1', 'chi2', 'phik'}, ...
     {'gzbar', 'gwbar'}, ...
+    {'gtrend_sum', 'gtrend_split'}, ... % 'GTrendRotation' rename of the above
     {'sig_gz', 'sig_gw', 'sig_xi'} ...
     };
 

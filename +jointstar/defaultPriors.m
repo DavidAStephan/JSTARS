@@ -67,6 +67,43 @@ k = 0; prm = struct('name', {}, 'type', {}, 'p1', {}, 'p2', {}, ...
             'lo', lo, 'hi', hi, 'init', init);
     end
 
+% 'GTrendRotation' (Checkpoint 13, DEFAULT FALSE): rotate the r*-trend
+% growth pair (gzbar, gwbar) -- pooled corr -0.83, worst cross-seed R-hats
+% under the raw kernel -- onto (gtrend_sum, gtrend_split) = (gzbar+gwbar,
+% gzbar-gwbar), mirroring the existing (phisum, phi2) gap-AR rotation.
+% ModelSpec.jointstar's ck = 0.025*(gzbar+gwbar)/(1-alpha) means the model
+% mainly identifies the SUM, so this puts the RW proposal on the
+% identified/unidentified axes directly.  Since gzbar ~ N(.30,.15) and
+% gwbar ~ N(.40,.15) have EQUAL sds, the implied (sum, split) prior is
+% exactly (not approximately) independent Normal: for independent
+% Normals, Cov(sum,split) = Var(gzbar) - Var(gwbar) = 0 when the sds
+% match, so no prior-equivalence approximation is involved here (see
+% notes for the general s1~=s2 case).  DEFAULT FALSE emits the original
+% gzbar/gwbar rows unchanged.
+ipr = inputParser;
+ipr.addParameter('GTrendRotation', false);
+ipr.KeepUnmatched = true;
+ipr.parse(varargin{:});
+useGTrendRotation = ipr.Results.GTrendRotation;
+
+% 'RateGapAR' (design e4d, DEFAULT FALSE): switch the xi state (the
+% non-trend-growth component of r*, r*_t = 4/(1-alpha)*gz_t + xi_t) from
+% a driftless random walk (A0(xi,xi)=1, P1(xi,xi)=4 fixed) to a
+% stationary mean-zero AR(1), A0(xi,xi)=rho_rg, P1(xi,xi)=
+% sig_xi^2/(1-rho_rg^2).  This removes the permanent-shock (unit-root)
+% component the RW currently contributes to the IS equation's rate-gap
+% forcing term (nu/2)*sum_j(r_{t-j}-r*_{t-j}), which today inherits an
+% accumulating xi piece -- the owner's "make the [RW piece of] the real
+% rate gap an AR process" instruction.  sig_xi, the IS-equation loadings
+% on xi, and the r1/r2 exogenous forcing are all UNCHANGED (see
+% ModelSpec.jointstar).  DEFAULT FALSE => isfield(th,'rho_rg') is false
+% => A0(xi,xi)=1, P1(xi,xi)=4 exactly as before, bit-identical.
+ipg = inputParser;
+ipg.addParameter('RateGapAR', false);
+ipg.KeepUnmatched = true;
+ipg.parse(varargin{:});
+useRateGapAR = ipg.Results.RateGapAR;
+
 % ---- dynamics (Rees 2019 priors where reported) ------------------------
 % Beta(a,b) from (mean m, sd s): c = m(1-m)/s^2 - 1, a = m*c, b = (1-m)*c
 add('gamma1', 'beta', 3.0, 2.0, 0, 1, 0.6);    % pi^e weight: B(m=.6, s=.2)
@@ -85,13 +122,32 @@ add('chi1',   'norm',  0.00, 0.7071, -Inf, Inf,  0.00);
 add('chi2',   'norm',  0.00, 0.7071, -Inf, Inf,  0.00);
 add('rhok',   'beta', 0.889, 0.889, 0, 1, 0.50);
 add('rhow',   'beta', 0.889, 0.889, 0, 1, 0.50);
+if useRateGapAR
+    % rate-gap AR(1) persistence (design e4d).  Beta(9.99,1.76) =>
+    % mean 0.85, sd 0.10: centred below the slower financial-cycle
+    % literature range (~0.90-0.97, e.g. DGGT19's convenience-yield
+    % factor) so ~132 quarters of real-rate data (1993Q1+) can pull it
+    % away from a de facto unit root, while (0,1) Beta support enforces
+    % stationarity automatically (no joint constraint code needed, unlike
+    % phi1/phi2).
+    add('rho_rg', 'beta', 9.99, 1.76, 0, 1, 0.85);
+end
 % gap AR(2) in (sum, second-lag) parameterisation; phi1 = phisum - phi2
 add('phisum', 'beta', 0.986, 0.986, 0, 1, 0.75);        % B(m=.5, s=.29)
 add('phi2',   'norm', -0.50, 1.00, -Inf, Inf, -0.40);
 add('nu',     'norm', -0.10, 0.15, -Inf, Inf, -0.10); % IS slope
 add('alpha',  'tnorm', 0.35, 0.05, 0.15, 0.55, 0.35); % capital share
-add('gzbar',  'norm',  0.30, 0.15, -Inf, Inf,  0.30); % mean MFP drift, %/q
-add('gwbar',  'norm',  0.40, 0.15, -Inf, Inf,  0.40); % mean wapop drift, %/q
+if ~useGTrendRotation
+    add('gzbar',  'norm',  0.30, 0.15, -Inf, Inf,  0.30); % mean MFP drift, %/q
+    add('gwbar',  'norm',  0.40, 0.15, -Inf, Inf,  0.40); % mean wapop drift, %/q
+else
+    % implied-exact rotation of N(.30,.15)/N(.40,.15) (equal sds => the
+    % (sum,split) pair is exactly independent Normal, see note above):
+    %   mean_sum = .30+.40 = .70,  var_sum = .15^2+.15^2 = .045
+    %   mean_split = .30-.40 = -.10, var_split = .15^2+.15^2 = .045
+    add('gtrend_sum',   'norm',  0.70, sqrt(2) * 0.15, -Inf, Inf,  0.70);
+    add('gtrend_split', 'norm', -0.10, sqrt(2) * 0.15, -Inf, Inf, -0.10);
+end
 add('pistar', 'norm',  2.50, 0.50, -Inf, Inf,  2.50); % inflation target
 add('alphapi', 'unif', 0, 0, 0.01, 0.99, 0.10);       % pi^e pull to target
 % COVID level shifters.  phi_y, phi_u sign-restricted to < 0 per the
@@ -146,6 +202,7 @@ add('m93_U',  'logn', log(1.5), 0.5, 0, Inf, 1.5);
 % the model owner), all truncated >= 1 -----------------------------------
 ipk = inputParser;
 ipk.addParameter('HierKappa', false);
+ipk.KeepUnmatched = true;
 ipk.parse(varargin{:});
 
 kap = {'kapc_2021', 'kapy_20', 'kapy_21', 'kapu_20', 'kapu_2122', ...

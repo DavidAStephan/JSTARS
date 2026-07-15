@@ -73,6 +73,25 @@ classdef testEvalCache < matlab.unittest.TestCase
                 'jointstar:cacheMismatch');
         end
 
+        function cacheMatchesNoCache_rateGapAR(tc)
+            % 'RateGapAR' (design e4d) makes P1(xi,xi) theta-dependent,
+            % the first P1 cell ever to vary with theta.  computeLogLik's
+            % cache path must detect isequal(sys.P1, cache.P1) failing on
+            % (almost) every draw and fall through to a fresh
+            % tryInvSPD(sys.P1) -- this exercises that fallback path for
+            % the first time (previously never hit, since P1 was always
+            % theta-independent before this option existed).
+            rng(45);
+            dat = jointstar.loadData(tc.DataFile, 'PieObs', true);
+            P = jointstar.defaultPriors('RateGapAR', true);
+            cache = jointstar.buildEvalCache(dat, P);
+
+            Theta = jointstar.priorSample(P, 10);
+            for i = 1:size(Theta, 1)
+                tc.verifyLoglikMatches(P, dat, cache, Theta(i, :));
+            end
+        end
+
         function stateDrawsMatch(tc)
             rng(44);
             dat = jointstar.loadData(tc.DataFile, 'PieObs', true);

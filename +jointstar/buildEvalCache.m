@@ -27,8 +27,17 @@ function cache = buildEvalCache(dat, P)
 %       exactly which t's share a bit-identical OBSERVED submatrix
 %       Rt(idx,idx), so its chol/inverse is computed once per combination
 %       instead of once per t
-%     * P1 (always a hardcoded constant in ModelSpec.jointstar, never a
-%       function of theta) and its inverse/log-det, computed once
+%     * P1 (a hardcoded constant in ModelSpec.jointstar, and never a
+%       function of theta EXCEPT under 'RateGapAR' [DEFAULT FALSE], where
+%       P1(xi,xi) = sig_xi^2/(1-rho_rg^2) does vary with theta) and its
+%       inverse/log-det, computed once from the probe theta used to build
+%       this cache.  When 'RateGapAR' is on, computeLogLik's cache path
+%       detects sys.P1 ~= cache.P1 on (almost) every draw and falls
+%       through to a fresh tryInvSPD(sys.P1) per eval (see computeLogLik,
+%       "cache.P1inv/logdetP1" below) -- correct, just not memoized; a
+%       small perf cost, not a correctness risk, since P1 stays diagonal
+%       and SPD for rho_rg in (0,1) (enforced by its Beta(0,1) prior
+%       support).
 %     * a fill-reducing permutation for Htilde's sparsity pattern (cache.
 %       perm).  NOTE: computeLogLik does NOT reuse this to skip 'vector'
 %       mode's own AMD step -- that was tried and measurably failed
@@ -154,7 +163,10 @@ rowStartT = [0; cumsum(nIdxT(1:end - 1))];
 % ---- Q regime groups (COVID kappa / pre84 / pre93 windows) ---------------
 [Qgroup, QgroupRep, nGQ] = groupCols(reshape(sys0.Q, m * m, T), T);
 
-% ---- P1: constant, never a function of theta -----------------------------
+% ---- P1: constant EXCEPT under 'RateGapAR' (see docstring above); this
+% cached value/inverse still comes from the probe theta and is only a
+% valid shortcut when computeLogLik's isequal(sys.P1, cache.P1) guard
+% passes -----------------------------------------------------------------
 P1 = sys0.P1;
 LP1 = chol((P1 + P1') / 2, 'lower');
 P1inv = LP1' \ (LP1 \ eye(m));

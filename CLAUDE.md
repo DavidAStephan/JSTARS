@@ -160,8 +160,9 @@ code yourself — delegate it to the appropriate sub-agent below.
   (confirmed **not** on `PATH` — sub-agents must call the full path,
   e.g. `/Applications/MATLAB_R2026a.app/bin/matlab -batch "..."`). 6-core
   Home license, Parallel Computing Toolbox licensed (Threads pool
-  works). Tests: `runtests('tests')` from the `jointstar/` root (26
-  tests green as of the last full run).
+  works). Tests: `runtests('tests')` from the repo root (53
+  tests green as of CHECKPOINT_13, incl. the MStepsLadder /
+  GTrendRotation / RateGapAR flag tests).
 
 ## Convergence discipline (read before estimating or judging any result)
 
@@ -213,6 +214,9 @@ sign-off before touching it:
   horseshoe ruling is now moot — with a diagonal covariance there are
   no shock cross-correlations to exclude; ν and the Okun loadings are
   identified structurally, as intended.
+- COVID-κ 2023 boundary: keep the current cutoff — κ reverts to 1 from
+  2023Q4, last elevated quarter 2023Q3, per the brief. Owner confirmed
+  2026-07-15; no code change. (Was an open question in CHECKPOINT_11.)
 
 ## Known open issues (candidate improvement targets)
 
@@ -220,19 +224,31 @@ From `checkpoints/CHECKPOINT_10.md` / `CHECKPOINT_11.md`:
 
 - **Seed-instability / ridge geometry (THE main one).** Max cross-seed
   R̂ ~5.8 on structural parameters; not fixed by dropping the horseshoe.
-  The posterior lives on long likelihood ridges — the gap-AR "hump"
-  (φ1+φ2 persistence matches the baseline but the split differs), the
-  ρ_U vs. Okun-loading trade-off, and the r* band. Reparameterizing
-  these ridges is the natural next work; the ≥3-seed pool is the
-  current mitigation, not a fix.
+  DIAGNOSED (CHECKPOINT_12, 2026-07-15): it is one **connected
+  likelihood ridge**, NOT genuine multimodality — bridging
+  log-posterior profiles between the most-separated seed clouds show
+  zero density valley on every path, and the 07-14 "shelf" (arm-B
+  seed at lpost ≈ −300 vs −340..−365) is the crest of the same ridge,
+  reachable monotonically (evidence in `results/multimodality_diag/`
+  and `results/armB_transformed_kernel/`). Fix family is sampler
+  mixing along the ridge, not mode-jumping. The transformed-kernel
+  A/B (`'MutationTransform'` + `'StructuredBlocks'`, commit 4ff28d2)
+  already showed max R̂ 5.82 → 2.84 and pooled γ2 −0.157 → −0.268
+  (the production γ2 is partly a sticky-kernel artifact).
+  CHECKPOINT_13 follow-ups (2026-07-15): `MStepsLadder` (late-stage
+  mutation ladder) improves further, 2.84 → **2.20** — the best known
+  config is MutationTransform+StructuredBlocks+MStepsLadder;
+  `GTrendRotation` (gzbar/gwbar sum/split) made things WORSE (2.68,
+  prediction refuted — keep dormant); `RateGapAR` (stationary AR ξ)
+  left convergence unchanged, data pushes rho_rg → 1, and it makes
+  the output gap MORE persistent/drifty — keep dormant. AWAITING
+  OWNER SIGN-OFF to enable the three winning flags in `production.m`
+  and regenerate the quotable table (moves γ2 −0.157 → ≈ −0.25).
+  The ≥3-seed pool remains mandatory.
 - Phillips-curve slope weakly identified / prior-driven (~−0.16).
 - r* is the least-identified latent state (band ±2.5pp+) absent a
   neutral-rate proxy; `pi_e` is the only trend-inflation anchor. Would
   extend before 1993 if a pre-1993 cash-rate history were supplied.
-- COVID-κ 2023 boundary: κ reverts to 1 from 2023Q4 (last elevated
-  quarter 2023Q3), per the brief; owner to confirm whether 2023Q4
-  should instead remain elevated (a one-line change to the window end
-  dates). See CHECKPOINT_11.
 
 ## Reasoning effort / model tier guidance
 
