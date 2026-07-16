@@ -66,6 +66,25 @@ function results = estimate(dataFile, varargin)
 %                            unidentified axes directly.  DEFAULT FALSE
 %                            emits the original gzbar/gwbar rows and
 %                            reproduces the exact prior code path.
+%     'WasteFree'   (false)  waste-free SMC mutation (Dau & Chopin 2022,
+%                            arXiv:2011.02328): instead of resampling
+%                            NParticles ancestors and running each through
+%                            MSteps_eff sweeps keeping only the endpoint,
+%                            resample a fixed M = round(0.25*NParticles)
+%                            chains every stage and advance each chain
+%                            P_stage-1 composite sweeps of the identical
+%                            stage-invariant kernel, KEEPING every visited
+%                            state; the cloud becomes M*P_stage particles
+%                            with equal weight, importance-reweighted by
+%                            the next stage's tempering increment. P_stage
+%                            is chosen each stage for eval-budget parity
+%                            with the classical path: M*(P_stage-1) ~=
+%                            NParticles*MSteps_eff(phi) (see
+%                            jointstar.runSMC 'WasteFree' doc for the
+%                            exact rule). DEFAULT FALSE reproduces the
+%                            exact prior code path and RNG consumption
+%                            bitwise -- for a later A/B only, not yet
+%                            used by jointstar.production.
 %     'RateGapAR'   (false)  design e4d: switch the xi state (r*_t =
 %                            4/(1-alpha)*gz_t + xi_t) from a driftless
 %                            random walk to a stationary mean-zero AR(1),
@@ -110,6 +129,7 @@ ip.addParameter('UseEvalCache', true);
 ip.addParameter('MutationTransform', false);
 ip.addParameter('StructuredBlocks', false);
 ip.addParameter('MStepsLadder', false);
+ip.addParameter('WasteFree', false);
 ip.addParameter('GTrendRotation', false);
 ip.addParameter('RateGapAR', false);
 ip.parse(varargin{:});
@@ -182,7 +202,8 @@ opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
     'SaveDir', o.OutDir, 'UseParallel', usePar, 'Verbose', true, ...
     'MutationTransform', o.MutationTransform, ...
     'StructuredBlocks', o.StructuredBlocks, ...
-    'MStepsLadder', o.MStepsLadder);
+    'MStepsLadder', o.MStepsLadder, ...
+    'WasteFree', o.WasteFree);
 % always restrict MH to the mutable columns: 'fixed' (calibrated)
 % parameters must never be proposed
 if isfield(P, 'mutateIdx')
