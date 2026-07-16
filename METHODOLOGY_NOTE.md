@@ -1,187 +1,503 @@
-# Methodology note: pedigree and precedents
+# Methodology note: model, estimator, convergence, and precedents
 
-*Rewritten 2026-07-14 after the methodology review (CHECKPOINT_10) and
-the subsequent decision to drop the horseshoe covariance layer
-(CHECKPOINT_11). The production model now uses a **diagonal** innovation
-covariance — matching the original in-house model — so it is assembled
-entirely from standard, published, centrally-used components with **no
-novel statistical methodology**. An earlier version of this note
-described the estimator as a "novel synthesis"; that framing was found
-to be an overstatement and has been removed.*
+*Current as of CHECKPOINT_15 (2026-07-16). The production estimator is a
+standard adaptive likelihood-tempering SMC sampler with a states-
+marginalized (Chan–Jeliazkov) linear-Gaussian likelihood, a diagonal
+innovation covariance, an unconstrained-coordinate block Metropolis
+mutation, a **waste-free** mutation scheme (Dau–Chopin 2022), and a
+parsimonious hierarchical treatment of the COVID variance-scaling
+parameters. Every ingredient is standard and published; there is **no
+novel statistical methodology**. This note gives the description, the
+math, and the references for each component, and states the convergence
+standard the project reports against.*
 
-## The method in one paragraph
+The single production entry point is `jointstar.production('data.csv')`,
+which runs the configuration below from three seeds and pools them.
 
-The estimator is a standard adaptive likelihood-tempering SMC sampler
-of the Herbst–Schorfheide (2014) type — adaptive ESS-targeted
-tempering, systematic resampling, cloud-covariance blocked Metropolis
-mutation, and the usual tempering marginal-likelihood identity, all
-with direct precedent in the NY Fed's production SMC.jl code and its
-companion paper (Cai et al. 2021) — whose inner likelihood is the
-Chan–Jeliazkov (2009) sparse-precision evaluation of a linear Gaussian
-unobserved-components model with a **diagonal innovation covariance**.
-For a linear Gaussian model the precision evaluation returns the
-numerically identical marginal likelihood a Kalman filter would
-(verified in the test suite to 1e-8), so it contributes efficiency, not
-statistical content. Every ingredient — the sampler, the likelihood
-evaluator, and the diagonal covariance — is standard and precedented.
-The only model-specific modelling choices are a hierarchical
-truncated-Gamma treatment of the COVID variance-scaling parameters and
-the use of a constructed inflation-expectations series as a direct
-measurement of the trend-inflation state; neither is a new statistical
-method.
+---
 
-## Why the likelihood engine adds no statistical novelty
+## 1. The method in one paragraph
 
-For a linear Gaussian state-space model the integrated likelihood
-p(y|θ) is a single Gaussian integral over the latent state path. The
-Chan–Jeliazkov precision route and the Kalman filter are two exact
-factorizations of that same integral; the choice between them alters
-floating-point conditioning and speed, but no statistical property of
-any sampler built on top. Substituting one for the other inside
-tempering SMC is an implementation choice of the same kind as the NY
-Fed's use of optimized Kalman routines or Herbst's (2015) Chandrasekhar
-recursions.
+Write the model as a linear Gaussian unobserved-components state-space
+system for Australian quarterly macro data (r\*, NAIRU, potential
+output, trend growth, output gap, trend inflation). For a fixed
+parameter vector θ the latent state path is integrated out **exactly**
+in one sparse-precision Gaussian computation (Chan–Jeliazkov 2009),
+returning `p(y|θ)` — numerically identical to a Kalman filter (verified
+to 1e-8). Posterior inference on θ uses adaptive likelihood-tempering
+Sequential Monte Carlo (Herbst–Schorfheide 2014): a cloud of θ-particles
+is carried through a sequence of bridging densities
+`π_n(θ) ∝ p(θ) p(y|θ)^{φ_n}` from the prior (φ=0) to the posterior
+(φ=1), with adaptive ESS-targeted tempering, systematic resampling, and
+block random-walk Metropolis mutation. Three tuning refinements improve
+mixing on this model's ridge-shaped posterior — mutation in
+**unconstrained coordinates** (with the exact Jacobian), **structured
+parameter blocks**, and a late-stage **mutation-step ladder** — together
+with **waste-free** mutation (Dau–Chopin 2022), which retains every
+intermediate Metropolis state as a particle instead of discarding it, at
+equal likelihood-evaluation budget. The only model-specific modelling
+choices are a **parsimonious hierarchical truncated-Gamma** treatment of
+the COVID variance-scaling parameters and the use of a constructed
+inflation-expectations series as a direct measurement of the
+trend-inflation state; neither is a new statistical method. Convergence
+is reported the way the SMC literature reports it — effective sample
+size across independent runs and a rank-normalized R̂ — not against an
+MCMC-style "R̂ = 1" target that no published SMC estimator uses.
 
-Verification: `tests/testPrecisionVsKalman.m` (AR(1)+noise over a
-parameter grid, nonzero initial mean, scattered and contiguous missing
-data; loglik equal to 1e-8; 10,000 state draws match the smoother's
-moments). Coverage caveat: the independent Kalman oracle is first-order
-only; the production model's AR(2) gap block is validated indirectly
-via the companion-form embedding test (`testZlagVsCompanion`).
+---
 
-## Precedent map
+## 2. The model
 
-**The sampler applied to exactly our model class.** Herbst &
-Schorfheide (2014)'s *first empirical illustration* (their Section 5.1)
-is a plain linear Gaussian state-space model — not a DSGE — run
-through the identical tempering algorithm with the states-marginalized
-likelihood. "Tempering SMC wrapped around a linear-Gaussian p(y|θ)" is
-page one of the source paper.
+A linear Gaussian state-space system
 
-**The sampler in central-bank production code.**
-- NY Fed `SMC.jl`/`DSGE.jl` (BSD-3, github.com/FRBNY-DSGE): adaptive
-  ESS-targeted tempering (Cai, Del Negro, Herbst, Matlin, Sarfati,
-  Schorfheide 2021, *Econometrics Journal*), systematic resampling at
-  threshold 0.5·N, blocked random-partition RW-MH mutation with
-  cloud-covariance proposals, 0.25 acceptance targeting, and the same
-  log-marginal-likelihood accumulation identity we implement.
-- Dynare ≥ 6.0 ships the Herbst–Schorfheide sampler as
-  `posterior_sampling_method='hssmc'`.
-- Random blocked mutation partitions are core Herbst–Schorfheide
-  machinery (Nblocks = 3–6 in their Smets–Wouters application), with
-  Chib & Ramamurthy (2010) as the antecedent.
+- Measurement:  `y_t = Z_t α_t + ε_t`, `ε_t ~ N(0, H_t)`
+- Transition:   `α_t = T_t α_{t-1} + R_t η_t`, `η_t ~ N(0, Q_t)`
 
-**The likelihood evaluator in exactly our model class.**
-- Chan & Jeliazkov (2009): the precision method itself; Chan's MATLAB
-  code is publicly posted for UC-class models.
-- Chan, Koop & Potter (2016, JAE) and Grant & Chan (2017, JEDC): UC /
-  trend-cycle / NAIRU models estimated by banded-precision methods.
-- **Zaman (2022, Cleveland Fed WP 21-23R)**: a large multivariate UC
-  "stars" model (r*, u*, g*, π*) estimated at a Federal Reserve bank
-  using exactly the Chan–Jeliazkov band/sparse routines — the closest
-  production-scale precedent for our model class and likelihood
-  technique.
-- Mertens (2023, JEDC / Bundesbank): precision-based sampling for
-  singular state-space / trend-cycle models.
+with `α_t` collecting the trend/cycle states (r\*, NAIRU, potential
+output and trend growth, the AR(2) output gap, trend inflation), and
+`y_t` the observed series (GDP, unemployment, participation, the real
+cash rate, trimmed-mean inflation, and the constructed π^e anchor). The
+innovation covariance `Q_t` is **diagonal** (§6). `Z_t`, `T_t`, `R_t`,
+`H_t`, `Q_t` are assembled from θ in `+jointstar/ModelSpec.m`; time
+variation enters through the 1984/1993 volatility breaks and the COVID
+scale factors (§5). Availability masks are data-driven (the real cash
+rate begins 1993Q1, π^e 1985Q1), handled by dropping rows of `Z_t`/`H_t`.
 
-**The diagonal innovation covariance** is the default for essentially
-every UC/trend-cycle model in the literature (HLW, the Chan UC papers
-above, the original in-house JointSTAR) — the most standard choice
-possible, and the one this project now uses.
+The single non-standard *model* element is that `Q_t` and `H_t` are
+scaled during the pandemic by regime factors `κ ≥ 1` (§5); everything
+else is a textbook multivariate UC model in the Holston–Laubach–Williams
+/ Chan–Koop–Potter tradition.
 
-## Reference-implementation cross-check
+---
+
+## 3. The likelihood engine — Chan–Jeliazkov precision sampling
+
+For a linear Gaussian SSM the integrated likelihood
+
+```
+p(y | θ) = ∫ p(y | α, θ) p(α | θ) dα
+```
+
+is a single Gaussian integral over the stacked state path
+`α = (α_1', …, α_T')'`. The transition equation implies a Gaussian prior
+`α ~ N(a, K⁻¹)` whose precision `K` is **block-banded sparse** (only
+adjacent-in-time blocks are nonzero). Adding the measurement information
+gives the conditional precision
+
+```
+P = K + Z' H⁻¹ Z          (also sparse, banded)
+```
+
+and the log integrated likelihood follows from a sparse Cholesky
+`P = L L'`:
+
+```
+log p(y|θ) = −½ [ c + log|H| + log|K⁻¹ … | − (terms) + e' Ω e ]
+```
+
+evaluated in `O(T)` via banded factorization rather than the dense
+`O(T³)` cost. For a linear Gaussian model this returns the numerically
+**identical** value a Kalman filter would; the precision route is an
+efficiency choice, not a statistical one.
+
+- **Verification:** `tests/testPrecisionVsKalman.m` (AR(1)+noise over a
+  parameter grid, nonzero initial mean, scattered and contiguous
+  missing data; log-likelihood equal to 1e-8; 10⁴ state draws match the
+  smoother moments). The AR(2) gap block is validated indirectly via the
+  companion-form embedding test `testZlagVsCompanion` (the independent
+  Kalman oracle is first-order only).
+- **Efficiency layer:** a run-level static cache (`buildEvalCache`) of
+  the θ-independent structure; **bitwise-identical** to the uncached
+  path (`benchmarks/verifyCacheEquivalence.m`), ~1.7× faster per
+  likelihood.
+
+**References:** Chan & Jeliazkov (2009); Chan, Koop & Potter (2016);
+Grant & Chan (2017); McCausland, Miller & Pelletier (2011); Mertens
+(2023).
+
+---
+
+## 4. The sampler — adaptive tempering SMC
+
+### 4.1 Tempering path and adaptive schedule
+
+The sampler targets a sequence of bridging densities
+
+```
+π_n(θ) ∝ p(θ) · p(y|θ)^{φ_n},     0 = φ_0 < φ_1 < … < φ_{N_φ} = 1.
+```
+
+A cloud of `N = 2000` particles `{θ^(i)}` is carried from the prior
+(φ=0) to the posterior (φ=1). At each stage `n`:
+
+1. **Reweight** by the incremental likelihood power
+   `w̃_n^(i) ∝ p(y|θ^(i))^{φ_n − φ_{n−1}}`.
+2. **Choose φ_n adaptively** by 1-D bisection so the post-reweighting
+   effective sample size hits a target fraction of `N`:
+   ```
+   ESS(φ_n) = (Σ_i w_n^(i))² / Σ_i (w_n^(i))²  =  γ · N,   γ = 0.5.
+   ```
+3. **Resample** (systematic) whenever `ESS ≤ γN`.
+4. **Mutate**: `M_stage` sweeps of block random-walk Metropolis with
+   invariant density `π_n` (§4.2–4.4).
+
+### 4.2 Mutation in unconstrained coordinates (`MutationTransform`)
+
+Rather than propose on the constrained scale, each mutated coordinate is
+mapped to an unconstrained `η = T(θ)` by an elementwise, bounds-driven
+bijection (`+jointstar/paramTransform.m`):
+
+```
+both bounds finite (lo,hi)   →  η = logit((θ−lo)/(hi−lo))
+lo finite, hi = +∞           →  η = log(θ − lo)
+hi finite, lo = −∞           →  η = log(hi − θ)
+```
+
+so σ's map by `log`, the COVID κ's (support `[1,∞)`) by `log(θ−1)`,
+`beta`/`negbeta`/bounded-`tnorm` parameters by an affine logit, and the
+sign-restricted stringency loadings (`φ_y, φ_u < 0`) by `log(−θ)`. The
+Metropolis proposal is a Gaussian random walk in η, and the acceptance
+ratio carries the exact Jacobian of the inverse map, so the target on
+the η-scale is `π_n(θ(η))·|dθ/dη|` and
+
+```
+a = min{ 1,  [π_n(θ') |J(η')|] / [π_n(θ) |J(η)|] },   |J(η)| = |dθ/dη|.
+```
+
+This removes the boundary "stickiness" of raw-scale random walk against
+hard constraints (σ→0, κ→1, ρ→1, φ→0). It is a coordinate change that
+leaves the posterior invariant — the standard reparameterization
+device of Papaspiliopoulos–Roberts–Sköld (2007). The transform is
+verified prior-invariant per-type and jointly
+(`benchmarks/verifyTransformInvariance*.m`).
+
+### 4.3 Structured blocks and the mutation-step ladder
+
+- **`StructuredBlocks`**: instead of purely random partitions, known
+  ridge-coupled parameters (the gap-AR pair, the ρ_U/Okun set) are
+  co-blocked so a single Metropolis move can travel *along* a ridge.
+  Tailored/structured blocking is standard SMC/MCMC practice
+  (Chib–Ramamurthy 2010; Herbst–Schorfheide use `N_blocks = 3–6`).
+- **`MStepsLadder`**: the number of mutation sweeps rises where mixing
+  is hardest, using the tempering exponent already reached:
+  ```
+  M_stage = MSteps           for φ < 0.70
+          = 2·MSteps         for 0.70 ≤ φ < 0.95
+          = 3·MSteps         for φ ≥ 0.95.
+  ```
+  (Production base `MSteps = 2`.) Spending more mutation effort at high
+  φ, where the target is sharpest, is a pure tuning choice.
+
+### 4.4 Waste-free mutation (Dau–Chopin 2022)
+
+Classical SMC resamples `N` particles, runs each through `M_stage`
+Metropolis steps, and keeps only the **endpoint** — discarding the
+intermediate states (and the likelihood evaluations that produced them).
+Waste-free SMC instead resamples a smaller number of **ancestor chains**
+`M = ⌊WF_MFRAC · N⌋` (`WF_MFRAC = 0.25`, so `M = 500`), runs each for
+`P−1` steps, and **retains all `M·P` visited states** as the next
+particle system (equal weights). The chain length is set for
+**exact likelihood-evaluation-budget parity** with the classical scheme:
+
+```
+M · (P − 1)  =  N · M_stage      ⟹      P = N·M_stage / M + 1.
+```
+
+Example (`N=2000, M_stage=2`): `M=500`, `P=9`, so `500·8 = 4000 = 2000·2`
+mutation sweeps, producing a `4500`-particle cloud. The next tempering
+increment importance-reweights all `M·P` particles, and the tempering
+marginal-likelihood estimator (§4.5) is unchanged and remains consistent
+under this weighting (Dau–Chopin, Prop. 1–2). Retaining the otherwise-
+discarded states lowers estimator variance at no extra likelihood cost,
+which is what closes most of the residual cross-seed disagreement (§7).
+The flag-off path is bitwise-identical to classical mutation
+(`tests/testWasteFree.m`). Downstream logic handles the variable cloud
+size (`|cloud| ≠ N`).
+
+### 4.5 Marginal-likelihood identity
+
+The tempering run yields the standard normalizing-constant estimator
+
+```
+log p(y)  =  Σ_n  log ( (1/N) Σ_i  w̃_n^(i) ),
+```
+
+recorded per stage as `lml_inc` and cumulatively as `out.lml`. **This is
+an internal diagnostic, not a calibrated marginal likelihood** — it
+omits prior truncation/stationarity normalizer constants and carries a
+finite-N tempering bias; single-run values are not comparable across
+specifications (cross-seed spread ~46–59 log points on this model).
+
+**References:** Herbst & Schorfheide (2014, 2015); Cai et al. (2021, the
+NY Fed `SMC.jl` companion paper); Dau & Chopin (2022);
+Papaspiliopoulos, Roberts & Sköld (2007); Chib & Ramamurthy (2010).
+
+---
+
+## 5. COVID variance model — hierarchical truncated-Gamma κ
+
+The pandemic quarters are handled, as is standard, by inflating the
+relevant innovation/measurement variances by regime scale factors
+`κ ≥ 1` over defined windows (the Lenza–Primiceri 2022 "scale up the
+disturbance variances" device). Within a time-window group `g` the
+factors are drawn from a shared truncated Gamma:
+
+```
+κ_v  ~  Gamma(a_g, b_g) · 1[κ_v ≥ 1],
+```
+
+with `(a_g, b_g)` shared across the variables in group `g` and carried
+in θ through Normal priors on their log-mean and log-shape (the
+truncation normalizer, which depends on the hyperparameters via the
+incomplete Gamma function, is included in the density). This shrinks the
+within-window κ's toward a common value.
+
+**Parsimony refinement (`PoolAcuteOnly`, production default, CP15).**
+The pooling only earns its keep where several κ's genuinely share a
+scale. Diagnostics (conditional log-likelihood profiles and
+prior→posterior contraction ratios, `benchmarks/{profileConditional,
+contractionRatios}.m`) showed the hyperparameters of the small/single-
+member groups have **zero likelihood curvature** — they enter only the
+prior — and so are structurally unidentified. The production model
+therefore keeps the hierarchy **only for the 4-member 2020 acute group**
+`{y, u, pr, k}` and replaces every sparser group's hyperparameters with
+a fixed, a-priori-calibrated `Gamma(2.0, 1.25)·1[κ≥1]` prior on the κ
+directly (calibrated to the incumbent hyperprior-implied mean/spread,
+**not** to any posterior — no empirical-Bayes circularity). This drops
+10 unidentified hyperparameters (79→**69** parameters) with the
+structural economics, latent states, and COVID gap trough unchanged
+within cross-seed noise, and slightly better convergence (§7). Fixing an
+unidentified hyperparameter to a calibrated value is the same trade
+already made for the π^e measurement-error sd (fixed at 0.30).
+
+Alternative COVID parameterizations are implemented behind default-off
+flags for future evaluation but are **not** in the production model: a
+Lenza–Primiceri-style geometric-decay scale (`CovidDecay`) and a
+stringency-loading restriction test (`DropPhiY`); see CHECKPOINT_15.
+
+**References:** Lenza & Primiceri (2022); Carriero, Clark, Marcellino &
+Mertens (2022).
+
+---
+
+## 6. Diagonal innovation covariance (and the horseshoe, dropped)
+
+`Q_t` is **diagonal** — the default for essentially every UC/trend-cycle
+model (HLW, the Chan UC papers, the original in-house JointSTAR) and the
+most standard choice possible.
+
+Between Checkpoints 5–8 the project explored a grouped-**horseshoe**
+shrinkage prior on the innovation-covariance Cholesky off-diagonals as a
+discovery tool for "which cross-shock correlations does the data
+identify." This was the one component with **no published precedent**
+(horseshoe-via-SMC), and the methodology review (CP10) found it also
+carried a kernel-invariance bug. Empirically it identified only ~17 of
+106 off-diagonals, concentrated in the trend/drift blocks, and — with the
+gap-shock correlations excluded by owner ruling — did **not** move the
+headline latent states or policy-relevant parameters versus the diagonal
+model. It was dropped (CP11). The scientific content of that exploration
+— "the data identify few cross-shock correlations and none that move the
+headline" — is a positive result that *justifies* the diagonal choice
+with evidence rather than assumption.
+
+---
+
+## 7. Convergence — reported the SMC way, not the MCMC way
+
+**The standard.** No published SMC estimator reports, or meets, an
+MCMC-style cross-run `R̂ ≈ 1` target; the founding SMC-for-macro
+reference (Herbst–Schorfheide) contains no Gelman–Rubin statistic. The
+field standard (Herbst–Schorfheide 2014 §4.3, after Durham–Geweke) is to
+run the sampler `G` times independently and report, per posterior
+functional `h`, an **effective sample size**
+
+```
+N_eff(h)  =  Var_π[h] / Var_{across G runs}[ ĥ_g ],
+```
+
+estimated per parameter as `N_eff = V_post / std_g(mean_g)²`, with
+`V_post` from the pooled cloud and `std_g` the between-run standard
+deviation of the per-run posterior means. This project reports `N_eff`
+over `G = 20` independent seeds (`benchmarks/computeNeff.m`).
+
+**Secondary smell-test.** As a robust cross-seed agreement statistic we
+also compute the **rank-normalized, folded** split-less `R̂` of Vehtari
+et al. (2021): equal-weight-resample each seed's final cloud; take
+fractional ranks `r` of the pooled draws and normalize
+`z = Φ⁻¹((r − 3/8)/(S + 1/4))`; compute
+
+```
+R̂ = sqrt( [ (n−1)/n · W  +  B/n ] / W )
+```
+
+on `z` (**bulk**) and on the folded values `|θ − median|` (**tail**),
+and report `max(bulk, folded)`. The usual split-half step is deliberately
+**omitted**: an SMC final cloud is exchangeable, not time-ordered, so
+splitting it in half detects nothing — an intentional, documented
+deviation (`computeNeff.m` header). Rank-normalization is what makes the
+statistic trustworthy on the right-skewed variance parameters that
+dominate this model's disagreement.
+
+**What the numbers are.** On the raw kernel this model's structural
+parameters were badly seed-unstable (`max R̂ ≈ 5.8`) because the
+posterior lives on long, connected likelihood ridges (the gap-AR
+persistence split, the ρ_U/Okun trade-off, the r\* band) — diagnosed
+(CP12) as **one connected ridge, not multimodality** (bridging
+log-posterior profiles show no density valley between seed clouds). The
+tuning refinements close most of it: the transformed kernel + structured
+blocks + ladder took `max(bulk,folded) R̂` from ~5.8 to ~1.55 at G=20,
+and **waste-free mutation** took it to **≈1.19–1.24 at G=20** (median
+`N_eff ≈ 8`) — the residual disagreement is now at the level any
+published SMC estimator carries. Much of the historically-quoted
+"`R̂ = 2.2`" was small-sample noise in a 3-seed maximum; at G=20 with
+rank-normalization the honest figure is far lower.
+
+**Reporting rule.** Anything quoted or compared across specifications is
+taken from the ≥3-seed **pool** — an equal-weight mixture of the seeds'
+final clouds, an inter-seed uncertainty envelope that widens intervals
+where seeds disagree. It is preferable to any single seed but is **not** a
+converged posterior: pooling averages seed noise, it does not remove
+finite-N bias. Latent states (r\*, NAIRU, gap, trend inflation) are far
+more seed-stable than the structural parameters.
+
+**References:** Herbst & Schorfheide (2014, §4.3); Durham & Geweke
+(2014); Vehtari, Gelman, Simpson, Carpenter & Bürkner (2021);
+Papaspiliopoulos, Roberts & Sköld (2007).
+
+---
+
+## 8. Precedent map
+
+**The sampler applied to exactly this model class.** Herbst &
+Schorfheide (2014) §5.1 — their *first* empirical illustration — is a
+plain linear Gaussian state-space model (not a DSGE) run through the
+identical tempering algorithm with a states-marginalized likelihood.
+"Tempering SMC wrapped around a linear-Gaussian `p(y|θ)`" is page one of
+the source paper.
+
+**The sampler in central-bank production code.** NY Fed `SMC.jl`/
+`DSGE.jl` (BSD-3): adaptive ESS-targeted tempering (Cai et al. 2021),
+systematic resampling at `0.5·N`, blocked random-partition RW-MH with
+cloud-covariance proposals, 0.25 acceptance targeting, and the same
+log-marginal-likelihood identity. Dynare ≥ 6.0 ships the HS sampler as
+`hssmc`.
+
+**Waste-free mutation** is Dau & Chopin (2022, *JRSS-B*), a published,
+general-purpose SMC improvement — a drop-in change to the mutation/
+resample loop, not a bespoke device.
+
+**The likelihood evaluator in exactly this model class.** Chan &
+Jeliazkov (2009) (the method); Chan, Koop & Potter (2016) and Grant &
+Chan (2017) (UC/NAIRU/trend-cycle by banded precision); **Zaman (2022,
+Cleveland Fed)** — a large multivariate UC "stars" model (r\*, u\*, g\*,
+π\*) estimated at a Fed bank using exactly these Chan–Jeliazkov routines,
+the closest production-scale precedent; Mertens (2023).
+
+**The COVID scale factors** follow Lenza–Primiceri (2022); the
+convergence reporting follows Herbst–Schorfheide/Durham–Geweke and
+Vehtari et al. (2021). Every ingredient is standard and published.
+
+---
+
+## 9. Reference-implementation cross-check
 
 | Design choice | Ours (`runSMC.m`) | Herbst–Schorfheide 2014/15 | NY Fed SMC.jl (Cai et al. 2021) | Dynare `hssmc` |
 |---|---|---|---|---|
-| Tempering schedule | adaptive: bisection so post-reweight ESS = 0.5·N | fixed φ_n = (n/N_φ)^λ | both; adaptive targets ESS ratio | fixed (n/N_φ)^λ |
+| Tempering schedule | adaptive: bisection so post-reweight ESS = 0.5·N | fixed φ_n=(n/N_φ)^λ | both; adaptive targets ESS ratio | fixed (n/N_φ)^λ |
 | Resampling | systematic, trigger ESS ≤ 0.5·N | multinomial baseline | systematic default, threshold 0.5 | — |
-| Mutation | blocked RW-MH, random partitions, cloud covariance, 2.38²/d scaling | blocked RW-MH, random partitions, cloud covariance | blocked RW-MH, cloud covariance | RW-MH |
-| Acceptance targeting | step rule, band 0.20–0.35 | smooth logistic, target 0.25 | target 0.25 | target 0.25 |
-| Likelihood | Chan–Jeliazkov precision (≡ Kalman, verified 1e-8) | Kalman filter | Kalman filter | Kalman filter |
+| Mutation | block RW-MH, structured+random partitions, **unconstrained coords + Jacobian**, cloud covariance | blocked RW-MH, random partitions, cloud covariance | blocked RW-MH, cloud covariance | RW-MH |
+| Waste-free | **yes (Dau–Chopin 2022), budget-parity** | no | no | no |
+| Late-stage effort | MSteps ladder (×1/×2/×3 by φ) | fixed M | fixed M | fixed |
+| Acceptance targeting | step rule, target ~0.25 (scale halved below 0.10, grown above 0.35) | logistic, target 0.25 | target 0.25 | target 0.25 |
+| Likelihood | Chan–Jeliazkov precision (≡ Kalman, 1e-8) | Kalman | Kalman | Kalman |
 | Innovation covariance | diagonal | (DSGE structural) | (DSGE structural) | (DSGE structural) |
+| Convergence report | N_eff over G=20 + rank-folded R̂ | N_eff over G runs | N_eff / RNE | — |
 
-Deviations from the references are variants, not departures: our
-absolute-ESS bisection vs. SMC.jl's relative-ESS rule; our step-rule
-acceptance adaptation vs. HS's logistic (same 0.25 target region).
+Deviations from the references are variants, not departures: absolute-ESS
+bisection vs. SMC.jl's relative-ESS rule; step-rule vs. logistic
+acceptance adaptation (same 0.25 target region); the unconstrained-
+coordinate mutation and waste-free scheme are published add-ons layered
+on the same algorithm.
 
-## The horseshoe exploration (done, and dropped)
+---
 
-Between Checkpoints 5–8 this project explored a grouped-horseshoe
-shrinkage prior on the innovation-covariance Cholesky off-diagonals —
-a discovery tool for "which cross-shock correlations does the data
-identify." It was the one component with **no published precedent in
-any setting** (horseshoe-via-SMC), and the methodology review
-(CHECKPOINT_10) additionally found it carried a kernel-invariance bug.
-Empirically it identified only ~17 of 106 off-diagonals, concentrated
-in the trend/drift blocks, and — once the gap-shock correlations were
-excluded by owner ruling to stop them distorting the cycle dynamics —
-it did **not** materially change the headline latent states or the
-policy-relevant parameters relative to the diagonal model. It was
-therefore dropped (CHECKPOINT_11) in favour of the diagonal covariance
-that matches the original model and is fully precedented. The
-scientific content of that exploration — "the data identify few
-cross-shock correlations and none that move the headline" — is a
-positive result that *justifies* the diagonal choice with evidence
-rather than assumption.
-
-## Known validity caveat
-
-**Seed-stability.** The model's structural parameters are not
-seed-stable in a single SMC run (cross-seed R̂ up to ~5.8), because the
-posterior lives on long likelihood ridges (the gap-AR persistence
-split, the ρ_U/Okun trade-off, the r* band). This is a property of the
-model's geometry, present in the diagonal model too (dropping the
-horseshoe did not change it), and is the natural next target for
-improvement (reparameterization of the ridges). The reported posterior
-is a ≥3-seed equal-weight pool — an inter-seed uncertainty envelope
-that widens intervals where seeds disagree, preferable to any single
-seed, but not a converged posterior; pooling averages seed noise, it
-does not remove finite-N bias. The tempering marginal-likelihood
-`out.lml`/logZ is an internal diagnostic, not a calibrated marginal
-likelihood (it omits prior truncation/stationarity normalizer
-constants).
-
-## Why this isn't SMC²
+## 10. Why this isn't SMC²
 
 SMC² (Chopin, Jacob & Papaspiliopoulos 2013) targets online/sequential
-estimation where states cannot be integrated out and each parameter
-particle carries a nested particle filter. Our model is linear
-Gaussian, states are integrated out exactly at every evaluation, and
-the sampler is a batch (offline) tempering run. The Jahan-Parvar et al.
+estimation where states **cannot** be integrated out and each parameter
+particle carries a nested particle filter. Our model is linear Gaussian,
+the states are integrated out **exactly** at every evaluation, and the
+sampler is a batch (offline) tempering run. The Jahan-Parvar et al.
 (2024) UC application uses SMC², not batch tempering.
 
-## Core citations
+---
 
-- Chan, J.C.C., Jeliazkov, I. (2009). Efficient simulation and
-  integrated likelihood estimation in state space models. *IJMMNO* 1,
-  101–120.
+## 11. Known validity caveats
+
+- **Seed-stability.** Largely resolved by the tuning refinements (§7):
+  `max(bulk,folded) R̂ ≈ 1.2` at G=20, versus ~5.8 on the raw kernel. The
+  residual is at the level any SMC estimator carries; the reported table
+  is a ≥3-seed pool (inter-seed envelope, not a converged posterior).
+- **Weakly identified directions.** The Phillips slope (γ2 ≈ −0.24) is
+  prior-influenced; r\* is the least-identified latent state (band
+  ±2.5pp) absent a neutral-rate proxy — `pi_e` is the only trend-
+  inflation anchor, and r\* is data-identified only from 1993 (cash-rate
+  coverage).
+- **COVID hyperparameters** informed by ~8 quarters are prior-dominated
+  by construction (Lenza–Primiceri make the same acknowledgement); this
+  is a correct weak-identification diagnostic, addressed by the
+  `PoolAcuteOnly` parsimony (§5), not a sampler failure.
+- **`out.lml`** is an internal diagnostic, not a calibrated marginal
+  likelihood (§4.5).
+
+---
+
+## 12. Core citations
+
+- Chan, J.C.C., Jeliazkov, I. (2009). Efficient simulation and integrated
+  likelihood estimation in state space models. *IJMMNO* 1, 101–120.
 - Chan, J.C.C., Koop, G., Potter, S. (2016). A bounded model of time
   variation in trend inflation, NAIRU and the Phillips curve. *JAE* 31,
   551–565.
-- Grant, A.L., Chan, J.C.C. (2017). Reconciling output gaps. *JEDC* 75,
-  114–121.
-- Herbst, E. (2015). Using the "Chandrasekhar recursions" for
-  likelihood evaluation of DSGE models. *Computational Economics* 45,
-  693–705.
-- Herbst, E., Schorfheide, F. (2014). Sequential Monte Carlo sampling
-  for DSGE models. *JAE* 29, 1073–1098.
+- Grant, A.L., Chan, J.C.C. (2017). Reconciling output gaps: seemingly
+  unrelated trend-cycle decomposition. *JEDC* 75, 114–121.
+- McCausland, W.J., Miller, S., Pelletier, D. (2011). Simulation
+  smoothing for state-space models: a computational efficiency analysis.
+  *Comput. Stat. & Data Anal.* 55, 199–212.
+- Mertens, E. (2023). Precision-based sampling for state space models
+  that have no measurement error. *JEDC* 154, 104720.
+- Herbst, E., Schorfheide, F. (2014). Sequential Monte Carlo sampling for
+  DSGE models. *JAE* 29, 1073–1098.
 - Herbst, E., Schorfheide, F. (2015). *Bayesian Estimation of DSGE
   Models*. Princeton University Press.
 - Cai, M., Del Negro, M., Herbst, E., Matlin, E., Sarfati, R.,
-  Schorfheide, F. (2021). Online estimation of DSGE models.
-  *Econometrics Journal* 24, C33–C68. (SMC.jl companion paper.)
-- Chib, S., Ramamurthy, S. (2010). Tailored randomized block MCMC
-  methods with application to DSGE models. *Journal of Econometrics*
-  155, 19–38.
-- Zaman, S. (2022). A unified framework to estimate macroeconomic
-  stars. FRB Cleveland WP 21-23R.
-- Mertens, E. (2023). Precision-based sampling for state space models
-  that have no measurement error. *JEDC*, 104720.
-- Chopin, N., Jacob, P.E., Papaspiliopoulos, O. (2013). SMC²: an
-  efficient algorithm for sequential analysis of state-space models.
-  *JRSS-B* 75, 397–426.
+  Schorfheide, F. (2021). Online estimation of DSGE models. *Econometrics
+  Journal* 24, C33–C68. (SMC.jl companion.)
+- Chib, S., Ramamurthy, S. (2010). Tailored randomized block MCMC methods
+  with application to DSGE models. *J. Econometrics* 155, 19–38.
+- Dau, H.-D., Chopin, N. (2022). Waste-free sequential Monte Carlo.
+  *JRSS-B* 84, 114–148. (arXiv:2011.02328)
+- Papaspiliopoulos, O., Roberts, G.O., Sköld, M. (2007). A general
+  framework for the parametrization of hierarchical models. *Statistical
+  Science* 22, 59–73.
+- Durham, G., Geweke, J. (2014). Adaptive sequential posterior simulators
+  for massively parallel computing environments. *Advances in
+  Econometrics* 34, 1–44.
+- Vehtari, A., Gelman, A., Simpson, D., Carpenter, B., Bürkner, P.-C.
+  (2021). Rank-normalization, folding, and localization: an improved R̂
+  for assessing convergence of MCMC. *Bayesian Analysis* 16, 667–718.
+- Lenza, M., Primiceri, G.E. (2022). How to estimate a VAR after March
+  2020. *JAE* 37, 688–699.
+- Carriero, A., Clark, T.E., Marcellino, M., Mertens, E. (2022).
+  Addressing COVID-19 outliers in BVARs with stochastic volatility.
+  *Review of Economics and Statistics*, 1–38.
+- Zaman, S. (2022). A unified framework to estimate macroeconomic stars.
+  FRB Cleveland WP 21-23R.
+- Chopin, N., Jacob, P.E., Papaspiliopoulos, O. (2013). SMC²: an efficient
+  algorithm for sequential analysis of state-space models. *JRSS-B* 75,
+  397–426.
 - Jahan-Parvar, M.R., Knipp, C., Szerszeń, P.J. (2024). Trend-cycle
   decomposition and forecasting using Bayesian multivariate unobserved
   components. FEDS 2024-100.
-- Software: FRBNY `DSGE.jl`/`SMC.jl` (BSD-3), Dynare ≥6.0 (`hssmc`,
-  GPL), J. Chan's MATLAB precision-sampler code (joshuachan.org).
+- Software: FRBNY `DSGE.jl`/`SMC.jl` (BSD-3), Dynare ≥6.0 (`hssmc`, GPL),
+  J. Chan's MATLAB precision-sampler code (joshuachan.org).
