@@ -14,7 +14,8 @@ function out = production(dataFile)
 %   run to completion, in one call.
 %
 %   HEADLINE OUTPUT: the pooled coefficient table (posterior
-%   mean/sd/q05/q50/q95 per structural parameter, ~405 rows), returned
+%   mean/sd/q05/q50/q95 per structural parameter, 69 rows under the
+%   PoolAcuteOnly configuration), returned
 %   as out.coefficients and written to results/production/
 %   pooled_posterior.csv.  This is accompanied by the cross-seed Rhat
 %   convergence table and the pooled smoothed latent-state bands. This
@@ -27,23 +28,32 @@ function out = production(dataFile)
 %       jointstar.estimate(dataFile, 'NParticles', 2000, 'MSteps', 2, ...
 %           'Seed', s, 'HierKappa', true, 'PieObs', true, ...
 %           'MutationTransform', true, 'StructuredBlocks', true, ...
-%           'MStepsLadder', true, 'OutDir', <outRoot>/seed<s>)
+%           'MStepsLadder', true, 'WasteFree', true, ...
+%           'PoolAcuteOnly', true, 'OutDir', <outRoot>/seed<s>)
 %   skipping any seed whose OutDir already contains posterior_summary.csv
 %   (idempotent/resumable: safe to re-run after a partial or interrupted
 %   pass -- only the missing seeds are (re-)computed).
 %
-%   The transformed-kernel trio (MutationTransform + StructuredBlocks +
-%   MStepsLadder) is the CHECKPOINT_13 convergence configuration: it
-%   cut max cross-seed Rhat from 5.82 (raw kernel) to ~2.20 by mutating
-%   in unconstrained coordinates, co-blocking the named ridge atoms, and
-%   raising the late-stage MH-step count (x2 for phi>=0.7, x3 for
-%   phi>=0.95). These change only the sampler's proposal, not the model
-%   or its parameter set, so the pooling/Rhat machinery below is
-%   unaffected. NOTE: existing results/production/ was produced by the
-%   OLD raw kernel -- delete or move it before re-running so the pooled
-%   table is regenerated under the new configuration (gamma2 and several
-%   sigma/kappa params shift; the old values were partly sticky-kernel
-%   artifacts, see CHECKPOINT_12/13).
+%   Production configuration (all owner-signed-off):
+%     - transformed-kernel trio (MutationTransform + StructuredBlocks +
+%       MStepsLadder): CHECKPOINT_13, cut max cross-seed Rhat 5.82 -> 2.20.
+%     - WasteFree SMC (Dau-Chopin 2022): CHECKPOINT_14, cut max(bulk,
+%       folded) rank Rhat further to ~1.24 (G=20) at equal eval budget by
+%       retaining the mutation-chain states the classical kernel discards.
+%     - PoolAcuteOnly: CHECKPOINT_15, keeps the hierarchical COVID-kappa
+%       pooling only for the 4-member 2020 acute group and fixes a-priori
+%       calibrated priors on the sparser windows, dropping 10 structurally
+%       UNIDENTIFIED hyperparameters (79 -> 69 params). G=20-confirmed:
+%       convergence slightly better (rank Rhat 1.238 -> 1.188), structural
+%       economics and latent states within cross-seed noise.
+%   The sampler flags change only the proposal; PoolAcuteOnly changes the
+%   parameter set (69 params), so P below is built WITH the PoolAcuteOnly
+%   flag to match the clouds. NOTE: any pre-existing results/production/
+%   from an earlier configuration must be deleted/moved before re-running
+%   so the pooled table is regenerated under this configuration.
+%   Provenance of earlier tables: results/production_rawkernel/ (raw
+%   kernel), results/production_triokernel/ (trio kernel, no waste-free /
+%   PoolAcuteOnly).
 %
 %   outRoot defaults to 'results/production' relative to the current
 %   directory, so the normal invocation, jointstar.production('data.csv')
@@ -97,10 +107,11 @@ function out = production(dataFile)
 %   q95) -- just type out.coefficients to view the pooled coefficient
 %   table directly.
 %
-%   Cost: ~27 min/seed at MSteps=2, N=2000 -- about 80 minutes
-%   wall-clock the first time all three seeds are missing.  Effectively
-%   instant on any later call, since each seed is skipped independently
-%   once results/production/seed<s>/posterior_summary.csv exists.
+%   Cost: ~7 min/seed (diagonal spec, WasteFree, N=2000, MSteps=2) --
+%   about 20 minutes wall-clock the first time all three seeds are
+%   missing.  Effectively instant on any later call, since each seed is
+%   skipped independently once
+%   results/production/seed<s>/posterior_summary.csv exists.
 %
 %   See also jointstar.estimate, jointstar.validate,
 %   benchmarks/poolRuns.m, benchmarks/runConvergenceCheck.m.
@@ -123,10 +134,11 @@ for k = 1:numel(seeds)
         'Seed', s, 'HierKappa', true, ...
         'PieObs', true, ...
         'MutationTransform', true, 'StructuredBlocks', true, ...
-        'MStepsLadder', true, 'OutDir', od);
+        'MStepsLadder', true, 'WasteFree', true, ...
+        'PoolAcuteOnly', true, 'OutDir', od);
 end
 
-P = jointstar.defaultPriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
 
 % ---- pool posterior (benchmarks/poolRuns.m logic, replicated) ---------
 pooledFile = fullfile(outRoot, 'pooled_posterior.csv');
@@ -211,9 +223,18 @@ end
 
 % ======================================================================
 function S = loadFinalSnapshot(d)
+% Final snapshot = highest stage index parsed from the filename
+% (particles_stage_NN.mat), then asserted phi == 1.  Selecting by the
+% stage number in the name is copy-invariant; a datenum-based pick
+% mis-selects when a results directory has been copied (cp resets mtimes).
 snaps = dir(fullfile(d, 'particles_stage_*.mat'));
 assert(~isempty(snaps), 'no particle snapshots in %s', d);
-[~, iL] = max([snaps.datenum]);
+stageNo = zeros(numel(snaps), 1);
+for k = 1:numel(snaps)
+    tok = regexp(snaps(k).name, 'particles_stage_(\d+)\.mat', 'tokens', 'once');
+    stageNo(k) = str2double(tok{1});
+end
+[~, iL] = max(stageNo);
 S = load(fullfile(d, snaps(iL).name));
 assert(abs(S.phi - 1) < 1e-9, 'last snapshot in %s is not the phi=1 cloud', d);
 end

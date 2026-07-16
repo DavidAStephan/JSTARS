@@ -309,13 +309,33 @@ classdef ModelSpec
             kr = ones(p, T);
             kr(1, dat.pre84) = th.m84_y;
             kr(2, dat.pre93) = th.m93_pi;
-            kr(1, w.w2020) = th.kapy_20;    kr(1, w.w2021) = th.kapy_21;
+            % 'CovidDecay' (DEFAULT FALSE): replace the acute two-step
+            % kappas on rows 1,4,5,7 with a parametric geometric-decay SD
+            % multiplier (Lenza-Primiceri style), kr(row,t) = 1 +
+            % s0_row*rho_c^(t-t0), t0 = 2020Q2, over each row's original
+            % union window (both already start at 2020Q2, so the exponent
+            % over the mask is simply 0:(nnz-1)); kr = 1 outside. Rows
+            % 2,3,6 (kappi_2023, kappop_2021, kaphpp_2022) and the Q-side
+            % kapc_2021 are UNCHANGED either way -- not subsumed (see
+            % jointstar.defaultPriors). isfield(th,'s0_y') false =>
+            % bit-identical to the original two-step kappa fills.
+            hasCovidDecay = isfield(th, 's0_y');
+            if hasCovidDecay
+                idx21 = find(w.w2020_21); e21 = 0:(numel(idx21) - 1);
+                kr(1, idx21) = 1 + th.s0_y * th.rho_c .^ e21;
+                kr(7, idx21) = 1 + th.s0_k * th.rho_c .^ e21;
+                idx22 = find(w.w2020_22); e22 = 0:(numel(idx22) - 1);
+                kr(4, idx22) = 1 + th.s0_u * th.rho_c .^ e22;
+                kr(5, idx22) = 1 + th.s0_pr * th.rho_c .^ e22;
+            else
+                kr(1, w.w2020) = th.kapy_20;    kr(1, w.w2021) = th.kapy_21;
+                kr(4, w.w2020) = th.kapu_20;    kr(4, w.w2021_22) = th.kapu_2122;
+                kr(5, w.w2020) = th.kappr_20;   kr(5, w.w2021_22) = th.kappr_2122;
+                kr(7, w.w2020) = th.kapk_20;    kr(7, w.w2021) = th.kapk_21;
+            end
             kr(2, w.w2020_23) = th.kappi_2023;
             kr(3, w.w2020_21) = th.kappop_2021;
-            kr(4, w.w2020) = th.kapu_20;    kr(4, w.w2021_22) = th.kapu_2122;
-            kr(5, w.w2020) = th.kappr_20;   kr(5, w.w2021_22) = th.kappr_2122;
             kr(6, w.w2020_22) = th.kaphpp_2022;
-            kr(7, w.w2020) = th.kapk_20;    kr(7, w.w2021) = th.kapk_21;
             % pi_e row (if present): no COVID kappa, no break multiplier
 
             sme = [th.sme_y; th.sme_pi; th.sme_w; th.sme_U; ...

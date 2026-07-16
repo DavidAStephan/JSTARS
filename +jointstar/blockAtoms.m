@@ -18,7 +18,10 @@ function atoms = blockAtoms(P, covCols)
 %     atom on the raw kernel), {rhoU, xi1, xi2, phiu},
 %     {rhopr, theta1, theta2, phipr}, {rhohpp, lam1, lam2, phihpp},
 %     {rhok, chi1, chi2, phik}, {gzbar, gwbar} (or, under 'GTrendRotation',
-%     {gtrend_sum, gtrend_split}), {sig_gz, sig_gw, sig_xi}.
+%     {gtrend_sum, gtrend_split}), {sig_gz, sig_gw, sig_xi}, {s0_y, s0_u,
+%     s0_pr, s0_k, rho_c} (present only under 'CovidDecay' -- co-blocks
+%     the geometric-decay ridge, since rho_c is shared across all four
+%     rows).
 %
 %   The hierarchical-COVID-kappa hyper groups (present only when P was
 %   built with 'HierKappa', true) are built directly from P.kap, since
@@ -54,7 +57,8 @@ atomDefs = { ...
     {'rhok', 'chi1', 'chi2', 'phik'}, ...
     {'gzbar', 'gwbar'}, ...
     {'gtrend_sum', 'gtrend_split'}, ... % 'GTrendRotation' rename of the above
-    {'sig_gz', 'sig_gw', 'sig_xi'} ...
+    {'sig_gz', 'sig_gw', 'sig_xi'}, ...
+    {'s0_y', 's0_u', 's0_pr', 's0_k', 'rho_c'} ... % 'CovidDecay' addition
     };
 
 atoms = {};

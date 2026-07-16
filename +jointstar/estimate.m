@@ -100,6 +100,88 @@ function results = estimate(dataFile, varargin)
 %                            FALSE => isfield(th,'rho_rg') false =>
 %                            A0(xi,xi)=1, P1(xi,xi)=4 exactly as before,
 %                            bit-identical.
+%     'FixSingletonKappa' (false)  only meaningful when HierKappa=true:
+%                            the two single-member COVID-kappa window
+%                            groups (kaphpp_2022, kappi_2023) have
+%                            hierarchical hypers with ZERO likelihood
+%                            curvature (CHECKPOINT_14 -- they enter only
+%                            priorLogPdf, never ModelSpec).  This flag
+%                            drops their 4 hyper dims (theta 79 -> 75
+%                            under HierKappa) and gives each singleton
+%                            kappa a fixed truncated-Gamma(2.0, 1.25)
+%                            prior instead -- the CONDITIONAL prior at
+%                            the hypers' own prior means (a-priori
+%                            calibration only; see
+%                            jointstar.defaultPriors).  The multi-member
+%                            kappa groups are untouched.  DEFAULT FALSE
+%                            (or HierKappa=false) reproduces today's
+%                            add() sequence and P.kap byte-for-byte.
+%     'PoolAcuteOnly' (false)  only meaningful when HierKappa=true;
+%                            INDEPENDENT of FixSingletonKappa (own
+%                            option, own inputParser). Keeps the kappa
+%                            hierarchy ONLY for g1 = w2020 (the 4-member
+%                            acute window {kapy_20, kapu_20, kappr_20,
+%                            kapk_20}) and collapses ALL other groups --
+%                            g2(w2021), g3(w2122), g4(w2021tot),
+%                            g5(w2022tot), g6(w2023tot) -- to the same
+%                            fixed truncated-Gamma(2.0, 1.25) a-priori
+%                            calibration FixSingletonKappa already uses
+%                            for its two singletons (see
+%                            jointstar.defaultPriors). Drops 10 hyper
+%                            dims (theta 79 -> 69 under HierKappa); the
+%                            8 re-typed kappas remain free parameters in
+%                            mutateIdx. When both FixSingletonKappa and
+%                            PoolAcuteOnly are true, PoolAcuteOnly
+%                            dominates (it is a strict superset).
+%                            DEFAULT FALSE (or HierKappa=false)
+%                            reproduces today's add() sequence and
+%                            P.kap byte-for-byte.
+%     'CovidDecay'  (false)  only meaningful when HierKappa=true;
+%                            MUTUALLY EXCLUSIVE with PoolAcuteOnly and
+%                            FixSingletonKappa (errors if combined --
+%                            all three are alternative kappa
+%                            reparameterizations of the same window
+%                            groups). Replaces the 8 COVID kappas of the
+%                            acute two-step groups g1(w2020), g2(w2021),
+%                            g3(w2122) -- kapy_20/kapy_21 (row1 GDP),
+%                            kapu_20/kapu_2122 (row4 U), kappr_20/
+%                            kappr_2122 (row5 participation), kapk_20/
+%                            kapk_21 (row7 capital) -- with a parametric
+%                            geometric-decay SD multiplier
+%                            (Lenza-Primiceri style): kr(row,t) = 1 +
+%                            s0_row*rho_c^(t-t0), t0 = 2020Q2, over each
+%                            row's original union window, kr = 1 outside
+%                            (see jointstar.ModelSpec.jointstar). NEW
+%                            PARAMS (5): s0_y, s0_u, s0_pr, s0_k ('logn',
+%                            peak-excess SD amplitude per row) and a
+%                            single shared decay rate rho_c ('beta') --
+%                            see jointstar.defaultPriors for the a-priori
+%                            calibration. The kept groups g4(w2021tot =
+%                            {kapc_2021, kappop_2021}), g5(w2022tot =
+%                            {kaphpp_2022}), g6(w2023tot = {kappi_2023})
+%                            are unchanged. Parameter count 79 -> 70
+%                            under HierKappa (79 - 8 kappas - 6 hypers +
+%                            5 decay). DEFAULT FALSE (or HierKappa=false)
+%                            reproduces today's add() sequence and
+%                            P.kap byte-for-byte.
+%     'DropPhiY'    (false)  a nested-restriction hypothesis test of the
+%                            COVID level shifter on GDP (phiy).  When
+%                            DropPhiY=false (default), phiy is sign-
+%                            restricted <0 via truncated normal N(0,0.10)
+%                            on (-Inf,0).  When DropPhiY=true, phiy is
+%                            fixed at 0 ('fixed' prior type, excluded from
+%                            mutateIdx), dropping the GDP COVID intercept
+%                            term entirely from d_t.  This tests whether
+%                            the stringency loading is redundant GIVEN kappa
+%                            (the d_t/kappa competition on the 2020 GDP
+%                            drop).  This is a NESTED RESTRICTION (H0:
+%                            phiy=0 within H1: phiy<0), not a sign-flip
+%                            reversal.  Composes cleanly with all other
+%                            flags (orthogonal); phiu's sign restriction is
+%                            unchanged.  Parameter count 79 -> 78 (free
+%                            params 78 -> 77) when flag is true.  DEFAULT
+%                            FALSE reproduces the prior phiy row byte-for-
+%                            byte (see jointstar.defaultPriors).
 %
 %   Final-specification call (all owner rulings baked in; diagonal
 %   innovation covariance -- see CLAUDE.md "Owner rulings"):
@@ -132,6 +214,10 @@ ip.addParameter('MStepsLadder', false);
 ip.addParameter('WasteFree', false);
 ip.addParameter('GTrendRotation', false);
 ip.addParameter('RateGapAR', false);
+ip.addParameter('FixSingletonKappa', false);
+ip.addParameter('PoolAcuteOnly', false);
+ip.addParameter('CovidDecay', false);
+ip.addParameter('DropPhiY', false);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -150,7 +236,10 @@ dat = jointstar.loadData(dataFile, 'PieObs', o.PieObs);
 P = o.Priors;
 if isempty(P)
     P = jointstar.defaultPriors('HierKappa', o.HierKappa, ...
-        'GTrendRotation', o.GTrendRotation, 'RateGapAR', o.RateGapAR);
+        'GTrendRotation', o.GTrendRotation, 'RateGapAR', o.RateGapAR, ...
+        'FixSingletonKappa', o.FixSingletonKappa, ...
+        'PoolAcuteOnly', o.PoolAcuteOnly, ...
+        'CovidDecay', o.CovidDecay, 'DropPhiY', o.DropPhiY);
 end
 
 % Run-level cache of everything theta-independent (regime groupings,
