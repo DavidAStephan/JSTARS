@@ -262,6 +262,146 @@ comparison against the original:
 Everything else is a textbook multivariate UC model in the
 Holston–Laubach–Williams / Chan–Koop–Potter tradition.
 
+### 2.6 Estimated coefficients (current production pool)
+
+The production estimates below are the **pooled 3-seed table**
+(`results/production/pooled_posterior.csv`, waste-free + PoolAcuteOnly
+configuration, 69 parameters, 2026-07-16). Per §7 this is an **inter-seed
+uncertainty envelope**, not a converged posterior; the CSV is the source
+of truth and these numbers change when production is re-run. Columns are
+the pooled posterior **mean, sd, and 5/50/95% quantiles**.
+
+**Phillips curve and trend inflation** (eqs 2, and the `pie` transition):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| gamma1 | expectations weight (vs lagged π) | 0.501 | 0.069 | 0.385 | 0.500 | 0.612 |
+| gamma2 | Phillips slope (≤0) | −0.237 | 0.061 | −0.345 | −0.233 | −0.147 |
+| pistar | trend-inflation mean π̄ | 2.574 | 0.204 | 2.266 | 2.566 | 2.923 |
+| alphapi | π mean-reversion (post-1993) | 0.106 | 0.048 | 0.040 | 0.099 | 0.193 |
+
+**Output gap AR(2) and IS curve** (eq 1; φ1 = phisum − φ2 ≈ 1.33 implied):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| phisum | gap AR(2) persistence φ1+φ2 | 0.937 | 0.038 | 0.861 | 0.948 | 0.979 |
+| phi2 | gap AR(2) second lag | −0.394 | 0.169 | −0.623 | −0.427 | −0.069 |
+| nu | IS real-rate-gap coefficient | −0.015 | 0.028 | −0.068 | −0.011 | 0.025 |
+
+**Labour-market and capital cyclical loadings / gap persistence**
+(eqs 3–7: Okun-type loadings on the gap `c`, plus each series' own AR(1)):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| xi1 | U on c_t | −0.300 | 0.062 | −0.404 | −0.300 | −0.200 |
+| xi2 | U on c_{t−1} | 0.025 | 0.095 | −0.122 | 0.021 | 0.192 |
+| rhoU | U-gap persistence | 0.700 | 0.107 | 0.523 | 0.702 | 0.874 |
+| theta1 | lpr on c_t | −0.035 | 0.081 | −0.167 | −0.036 | 0.096 |
+| theta2 | lpr on c_{t−1} | 0.118 | 0.084 | −0.024 | 0.120 | 0.256 |
+| rhopr | lpr-gap persistence | 0.847 | 0.096 | 0.676 | 0.855 | 0.983 |
+| lam1 | hpp on c_t | 0.247 | 0.123 | 0.028 | 0.254 | 0.439 |
+| lam2 | hpp on c_{t−1} | −0.071 | 0.159 | −0.305 | −0.086 | 0.220 |
+| rhohpp | hpp-gap persistence | 0.511 | 0.129 | 0.299 | 0.513 | 0.722 |
+| chi1 | k on c_t | 0.031 | 0.019 | 0.001 | 0.031 | 0.063 |
+| chi2 | k on c_{t−1} | 0.016 | 0.019 | −0.016 | 0.015 | 0.048 |
+| rhok | k-gap persistence | 0.976 | 0.021 | 0.935 | 0.982 | 0.997 |
+| rhow | wapop-gap persistence | 0.960 | 0.028 | 0.905 | 0.967 | 0.995 |
+
+**Production function and trend growth** (τ* identity; ḡ constants):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| alpha | capital share a | 0.384 | 0.047 | 0.302 | 0.385 | 0.457 |
+| gzbar | mean productivity drift ḡ_z | 0.140 | 0.073 | 0.016 | 0.140 | 0.257 |
+| gwbar | mean population drift ḡ_w | 0.330 | 0.064 | 0.228 | 0.328 | 0.438 |
+
+**State innovation standard deviations** (`η_t`, §2.4):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| sig_c | output gap | 0.363 | 0.038 | 0.304 | 0.362 | 0.429 |
+| sig_Ustar | NAIRU | 0.097 | 0.015 | 0.075 | 0.096 | 0.123 |
+| sig_pie | trend inflation | 0.206 | 0.019 | 0.177 | 0.205 | 0.239 |
+| sig_z | z* level | 0.340 | 0.041 | 0.276 | 0.339 | 0.409 |
+| sig_gz | z* drift | 0.042 | 0.009 | 0.029 | 0.041 | 0.059 |
+| sig_k | k* level | 0.072 | 0.006 | 0.063 | 0.072 | 0.082 |
+| sig_gk | k* drift | 0.037 | 0.004 | 0.030 | 0.036 | 0.044 |
+| sig_w | w* level | 0.057 | 0.005 | 0.049 | 0.056 | 0.065 |
+| sig_gw | w* drift | 0.030 | 0.004 | 0.024 | 0.029 | 0.036 |
+| sig_hpp | hpp* level | 0.236 | 0.035 | 0.182 | 0.234 | 0.297 |
+| sig_ghpp | hpp* drift | 0.035 | 0.007 | 0.025 | 0.034 | 0.047 |
+| sig_pr | pr* level | 0.190 | 0.027 | 0.147 | 0.189 | 0.235 |
+| sig_gpr | pr* drift | 0.038 | 0.008 | 0.027 | 0.037 | 0.054 |
+| sig_xi | neutral-rate residual ξ | 0.134 | 0.036 | 0.087 | 0.128 | 0.199 |
+
+**Measurement-error standard deviations** (`ε_t`, §2.4; diagonal R):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| sme_y | GDP | 0.246 | 0.025 | 0.207 | 0.245 | 0.291 |
+| sme_pi | inflation | 0.651 | 0.045 | 0.581 | 0.650 | 0.729 |
+| sme_w | wapop | 0.055 | 0.004 | 0.048 | 0.055 | 0.063 |
+| sme_U | unemployment | 0.118 | 0.012 | 0.098 | 0.118 | 0.139 |
+| sme_pr | participation | 0.223 | 0.026 | 0.182 | 0.222 | 0.266 |
+| sme_hpp | hours per person | 0.343 | 0.028 | 0.299 | 0.343 | 0.390 |
+| sme_k | capital | 0.057 | 0.005 | 0.049 | 0.057 | 0.066 |
+| sme_pieobs | π^e (fixed, owner ruling) | 0.300 | — | 0.300 | 0.300 | 0.300 |
+
+**COVID stringency loadings** (`φ_·` in the measurement intercepts;
+φ_y, φ_u sign-restricted ≤ 0):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| phiy | GDP stringency | −0.023 | 0.015 | −0.052 | −0.021 | −0.003 |
+| phiu | U stringency | −0.007 | 0.003 | −0.013 | −0.007 | −0.003 |
+| phipr | lpr stringency | −0.001 | 0.009 | −0.016 | −0.001 | 0.016 |
+| phihpp | hpp stringency | 0.006 | 0.020 | −0.027 | 0.007 | 0.037 |
+| phik | k stringency | 0.000 | 0.002 | −0.002 | 0.000 | 0.003 |
+
+**Volatility-break multipliers** (`m84_·` pre-1984, `m93_·` pre-1993):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| m84_y | GDP meas. sd, pre-1984 | 1.214 | 0.426 | 0.605 | 1.173 | 1.968 |
+| m84_z | z* shock sd, pre-1984 | 1.879 | 0.496 | 1.085 | 1.867 | 2.724 |
+| m84_c | gap shock sd, pre-1984 | 1.746 | 0.339 | 1.245 | 1.707 | 2.362 |
+| m93_pi | inflation meas. sd, pre-1993 | 1.714 | 0.225 | 1.375 | 1.696 | 2.120 |
+| m93_U | NAIRU shock sd, pre-1993 | 1.780 | 0.410 | 1.159 | 1.748 | 2.497 |
+
+**COVID variance-scale factors** (`κ ≥ 1`, right-skewed — read the median;
+kapc_2021 scales the gap *innovation*, the rest scale *measurement* sds):
+
+| param | window / series | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| kapc_2021 | gap innovation, 2020–21 | 4.433 | 1.931 | 1.837 | 4.197 | 7.851 |
+| kapy_20 | GDP, 2020 | 8.689 | 3.969 | 3.635 | 8.009 | 16.18 |
+| kapy_21 | GDP, 2021 | 4.271 | 1.725 | 1.815 | 4.066 | 7.356 |
+| kapu_20 | U, 2020 | 5.228 | 3.064 | 1.581 | 4.639 | 11.03 |
+| kapu_2122 | U, 2021–22 | 1.973 | 0.762 | 1.149 | 1.786 | 3.469 |
+| kappr_20 | lpr, 2020 | 10.51 | 3.201 | 6.444 | 9.955 | 16.61 |
+| kappr_2122 | lpr, 2021–22 | 2.907 | 0.849 | 1.786 | 2.765 | 4.530 |
+| kaphpp_2022 | hpp, 2020–22 | 4.175 | 1.091 | 2.636 | 4.049 | 6.221 |
+| kappop_2021 | wapop, 2020–21 | 5.473 | 1.594 | 3.234 | 5.258 | 8.366 |
+| kappi_2023 | inflation, 2020–23 | 2.176 | 0.484 | 1.533 | 2.097 | 3.071 |
+| kapk_20 | capital, 2020 | 3.740 | 2.051 | 1.522 | 3.269 | 7.467 |
+| kapk_21 | capital, 2021 | 2.301 | 0.885 | 1.326 | 2.078 | 3.961 |
+
+**COVID-κ hierarchy hyperparameters** (2020 acute group only, under
+`PoolAcuteOnly`; log-mean and log-shape of the shared truncated Gamma):
+
+| param | meaning | mean | sd | 5% | 50% | 95% |
+|---|---|---|---|---|---|---|
+| kapHyp_lm_w2020 | log-mean, 2020 group | 1.616 | 0.357 | 1.000 | 1.634 | 2.152 |
+| kapHyp_la_w2020 | log-shape, 2020 group | 0.573 | 0.567 | −0.364 | 0.571 | 1.523 |
+
+Reading notes: γ2 ≈ −0.24 is the (weakly identified, prior-influenced)
+Phillips slope; the gap is highly persistent (φ_sum ≈ 0.94) with a
+negative second lag; the IS coefficient ν is small and its interval
+spans zero; the capital-gap and wapop-gap persistences (ρ_k ≈ 0.98,
+ρ_w ≈ 0.96) are near unit-root; the COVID measurement scales are large
+and right-skewed (informed by ~8 quarters — read the median, and see the
+weak-identification caveat in §11).
+
 ---
 
 ## 3. The likelihood engine — Chan–Jeliazkov precision sampling
