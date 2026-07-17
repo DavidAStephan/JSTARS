@@ -46,27 +46,221 @@ MCMC-style "R̂ = 1" target that no published SMC estimator uses.
 
 ---
 
-## 2. The model
+## 2. The estimated model — exact specification
 
-A linear Gaussian state-space system
+*This section transcribes the model exactly as built in
+`+jointstar/ModelSpec.m` (`jointstar` static constructor) and
+`+jointstar/loadData.m`, so the functional form can be checked against
+the source model it replicates. The generic container is a linear
+Gaussian state-space system*
 
-- Measurement:  `y_t = Z_t α_t + ε_t`, `ε_t ~ N(0, H_t)`
-- Transition:   `α_t = T_t α_{t-1} + R_t η_t`, `η_t ~ N(0, Q_t)`
+```
+α_t = c_t + A1_t α_{t−1} + A2_t α_{t−2} + η_t,   η_t ~ N(0, Q_t),   α_1 ~ N(a1, P1)
+y_t = d_t + Z_t α_t + Z^L_t α_{t−1} + ε_t,        ε_t ~ N(0, R_t)
+```
 
-with `α_t` collecting the trend/cycle states (r\*, NAIRU, potential
-output and trend growth, the AR(2) output gap, trend inflation), and
-`y_t` the observed series (GDP, unemployment, participation, the real
-cash rate, trimmed-mean inflation, and the constructed π^e anchor). The
-innovation covariance `Q_t` is **diagonal** (§6). `Z_t`, `T_t`, `R_t`,
-`H_t`, `Q_t` are assembled from θ in `+jointstar/ModelSpec.m`; time
-variation enters through the 1984/1993 volatility breaks and the COVID
-scale factors (§5). Availability masks are data-driven (the real cash
-rate begins 1993Q1, π^e 1985Q1), handled by dropping rows of `Z_t`/`H_t`.
+*with missing observations masked (never imputed). Below, `α` and `α_t`
+components are named; `a = alpha` is the capital share; a "drift" is the
+growth rate of a trend.*
 
-The single non-standard *model* element is that `Q_t` and `H_t` are
-scaled during the pandemic by regime factors `κ ≥ 1` (§5); everything
-else is a textbook multivariate UC model in the Holston–Laubach–Williams
-/ Chan–Koop–Potter tradition.
+### 2.1 State vector (m = 14)
+
+`α = ( c, U*, pie, z*, g^z, k*, g^k, w*, g^w, hpp*, g^{hpp}, pr*, g^{pr}, ξ )`
+
+- `c` — output gap (cyclical component)
+- `U*` — NAIRU (trend unemployment)
+- `pie` — trend inflation (the code's state name; also measured directly
+  by the π^e series). Distinct from the *observed* trimmed-mean inflation
+  `π` (measurement row 2).
+- `z*, k*, w*, hpp*, pr*` — trend levels of (labour-augmenting)
+  productivity, capital, working-age population, hours per person,
+  participation; each with its drift `g^z, g^k, g^w, g^{hpp}, g^{pr}`
+- `ξ` — the non-growth component of the neutral real rate
+
+Two derived combinations are used but are **not** separate states:
+potential output `τ*_t = z*_t + a·k*_t + (1−a)(w*_t + pr*_t + hpp*_t − U*_t)`
+and the neutral real rate `r*_t = [4/(1−a)]·g^z_t + ξ_t`.
+
+Constants (from θ): `c_z = 0.025·ḡ_z`, `c_w = 0.025·ḡ_w`,
+`c_k = 0.025·(ḡ_z+ḡ_w)/(1−a)`; gap AR(2) is parameterised as
+`(φ_sum, φ_2)` with `φ_1 = φ_sum − φ_2` (Rees 2019).
+
+### 2.2 State (transition) equations — exactly as coded
+
+**Output gap** — AR(2) plus an IS (real-rate-gap) term:
+```
+c_t = φ_1 c_{t−1} + φ_2 c_{t−2} + (ν/2) Σ_{j=1,2} ( r_{t−j} − r*_{t−j} ) + η^c_t
+```
+with `r*_{t−j} = [4/(1−a)]·g^z_{t−j} + ξ_{t−j}` and `r_{t−j}` the observed
+real cash rate. The IS term is **active only in quarters where both
+`r_{t−1}` and `r_{t−2}` are observed** (the real cash rate starts 1993Q1);
+where they are not, it is dropped, not imputed.
+
+**NAIRU** — random walk:  `U*_t = U*_{t−1} + η^{U*}_t`
+
+**Trend inflation** (`pie` state) — regime-switching at 1993Q1:
+```
+pie_t = pie_{t−1} + η^{pie}_t                                 (before 1993Q1, RW)
+pie_t = α_π · π̄ + (1 − α_π) pie_{t−1} + η^{pie}_t             (from 1993Q1, AR(1) to π̄ = pistar)
+```
+
+**Productivity / capital / population trends** — unit-root trend with a
+persistent, contemporaneous drift (persistence `ρ_d = 0.975`):
+```
+g^z_t = c_z + 0.975 g^z_{t−1} + η^{g^z}_t ;   z*_t = z*_{t−1} + g^z_t + η^{z}_t
+g^k_t = c_k + 0.975 g^k_{t−1} + η^{g^k}_t ;   k*_t = k*_{t−1} + g^k_t + η^{k}_t
+g^w_t = c_w + 0.975 g^w_{t−1} + η^{g^w}_t ;   w*_t = w*_{t−1} + g^w_t + η^{w}_t
+```
+**Hours and participation trends** — same form with `ρ_d = 0.95` and
+**zero drift intercept**:
+```
+g^{hpp}_t = 0.95 g^{hpp}_{t−1} + η^{g^{hpp}}_t ;   hpp*_t = hpp*_{t−1} + g^{hpp}_t + η^{hpp}_t
+g^{pr}_t  = 0.95 g^{pr}_{t−1}  + η^{g^{pr}}_t  ;   pr*_t  = pr*_{t−1}  + g^{pr}_t  + η^{pr}_t
+```
+"Contemporaneous drift" (`trend_t = trend_{t−1} + g_t + η`) is implemented
+exactly in the matrices by the lagged coefficient `A1(trend, g) = ρ_d`
+together with the innovation map `M` (§2.4) injecting the drift shock
+`η^{g}` into the trend row — the two combine to `trend_t = trend_{t−1} +
+g_t + η^{trend}`.
+
+**Neutral-rate residual** — random walk:  `ξ_t = ξ_{t−1} + η^{ξ}_t`
+
+### 2.3 Signal (measurement) equations — exactly as coded
+
+Observables and units (`+jointstar/loadData.m`): `y` = 100·log real
+non-farm GDP; `π` = trimmed-mean inflation (400·Δlog index, quarterly
+annualised); `wapop` = 100·log working-age population; `U` = unemployment
+rate (pp); `lpr` = 100·log(participation/100); `hpp` = 100·log average
+hours; `k` = 100·log real capital; `pie_obs` = π^e (optional 8th row).
+`D` is the COVID government-stringency index (0 outside the pandemic),
+`D^L` its lag; lagged **observed** series (`π_{t−1}`, `U_{t−1}`, `w_{t−1}`,
+…) enter the intercepts as exogenous data.
+
+**(1) GDP** — potential + gap + COVID shifter:
+```
+y_t = τ*_t + c_t + φ_y D_t + ε^y_t ,   τ*_t = z*_t + a k*_t + (1−a)(w*_t + pr*_t + hpp*_t − U*_t)
+```
+
+**(2) Inflation** — expectations-augmented Phillips curve (observed
+inflation `π`; trend-inflation state `pie`):
+```
+π_t = γ_1 pie_t + (1 − γ_1) π_{t−1} + γ_2 (U_t − U*_t) + γ_2 φ_u D_t + ε^π_t
+```
+(`γ_1` = weight on the trend-inflation state vs. lagged observed
+inflation; `γ_2 ≤ 0` the Phillips slope on the unemployment gap; the last
+term a COVID stringency shifter.)
+
+**(3) Working-age population** — AR(1) in its own gap, no cycle loading:
+```
+wapop_t = w*_t + ρ_w ( wapop_{t−1} − w*_{t−1} ) + ε^w_t
+```
+
+**(4)–(7) Unemployment, participation, hours, capital** — each its trend
++ an AR(1) gap (quasi-differenced via the observed lag) + a loading on
+the common output gap `c` (Okun-type) + a COVID shifter:
+```
+(4) U_t   = U*_t   + ρ_U  (U_{t−1}   − U*_{t−1})   + ξ_1 c_t + ξ_2 c_{t−1} − φ_u D_t   + ρ_U  φ_u  D_{t−1}  + ε^U_t
+(5) lpr_t = pr*_t  + ρ_pr (lpr_{t−1} − pr*_{t−1})  + θ_1 c_t + θ_2 c_{t−1} + φ_pr D_t  − ρ_pr φ_pr D_{t−1}  + ε^{lpr}_t
+(6) hpp_t = hpp*_t + ρ_hpp(hpp_{t−1} − hpp*_{t−1}) + λ_1 c_t + λ_2 c_{t−1} + φ_hpp D_t − ρ_hpp φ_hpp D_{t−1} + ε^{hpp}_t
+(7) k_t   = k*_t   + ρ_k  (k_{t−1}   − k*_{t−1})   + χ_1 c_t + χ_2 c_{t−1} + φ_k D_t   − ρ_k  φ_k  D_{t−1}  + ε^k_t
+```
+
+**(8) Inflation expectations** (optional, from 1985Q1) — direct noisy
+measurement of the trend-inflation state:
+```
+pie_obs_t = pie_t + ε^{pie}_t ,   sd(ε^{pie}) = sme_pieobs = 0.30 (fixed)
+```
+
+The stringency loadings `φ_y, φ_u < 0` are sign-restricted (owner ruling).
+The `d_t = 0` outside 2020–23 collapses the COVID-block rows to their
+pre-pandemic form (except the AR(1) intercepts, which always carry the
+observed lag).
+
+### 2.4 Error terms and covariance — the careful bit
+
+**State innovations `η_t ~ N(0, Q_t)`.** The underlying structural shocks
+are **mutually independent** with standard deviations
+`sig_c, sig_Ustar, sig_pie, sig_z, sig_gz, sig_k, sig_gk, sig_w, sig_gw,
+sig_hpp, sig_ghpp, sig_pr, sig_gpr, sig_xi` (14, one per state). The
+innovation covariance is assembled as
+
+```
+Q_t = M · ( Σ_0 ⊙ (k_t k_t') ) · M' ,   Σ_0 = diag(sig²)
+```
+
+- **`Σ_0` is diagonal** — the innovation covariance carries **no free
+  cross-shock correlations** (the grouped-horseshoe off-diagonal layer
+  explored in CP5–8 was dropped, §6). ν and the Okun/loadings are
+  identified structurally, not through a shock covariance.
+- **`M` (contemporaneous drift) is the only source of off-diagonal `Q`.**
+  It adds each drift shock into its trend row, so every trend/drift pair
+  has an exact **2×2 block**
+  ```
+  Var(η^{trend}) = sig_trend² + sig_drift²,  Cov(η^{trend}, η^{drift}) = sig_drift²,  Var(η^{drift}) = sig_drift².
+  ```
+  These within-pair covariances are a **structural consequence of the
+  timing** (drift enters the trend contemporaneously), not estimated
+  parameters. `Q_t` is therefore block-diagonal: scalar variances for
+  `c, U*, π, ξ`, and five 2×2 trend/drift blocks. Everything else is zero.
+- **`k_t` (variance scaling)** is 1 everywhere except: pre-1984 gap
+  (`×m84_c`) and `z*` (`×m84_z`); pre-1993 NAIRU (`×m93_U`); and the
+  2020–21 gap innovation (`×kapc_2021`, COVID). Scaling is multiplicative
+  on the shock sd (`Σ_0 ⊙ k k'`), preserving the block structure.
+
+**Measurement errors `ε_t ~ N(0, R_t)`.** In production `R_t` is
+**strictly diagonal** — **no cross-equation measurement-error
+correlation**:
+
+```
+R_t = diag( sme² ⊙ (k^R_t)² )
+```
+
+with per-equation sds `sme_y, sme_pi, sme_w, sme_U, sme_pr, sme_hpp,
+sme_k` (and `sme_pieobs = 0.30` fixed for the 8th row). The multipliers
+`k^R_t = 1` except for the volatility breaks (pre-1984 GDP `×m84_y`,
+pre-1993 inflation `×m93_pi`) and the COVID `κ ≥ 1` windows scaling the
+relevant measurement variances: GDP `×kapy_20 / kapy_21`, U `×kapu_20 /
+kapu_2122`, participation `×kappr_20 / kappr_2122`, capital `×kapk_20 /
+kapk_21`, inflation `×kappi_2023`, wapop `×kappop_2021`, hpp
+`×kaphpp_2022`. The COVID κ's are given the parsimonious hierarchical
+prior of §5; the π^e row takes no COVID or break multiplier.
+
+**A full non-diagonal measurement covariance `R_full`** is supported by
+the code (the CP5–8 horseshoe path supplied a Cholesky factor `L_r`) but
+is **not** used in production — production runs the fast diagonal path.
+
+**Initial state.** `a1` anchors the trend levels to first-observation
+data (`z*` backed out from the GDP identity) with small drift means;
+`P1 = diag([25,25,25,100,0.25,100,0.25,100,0.25,100,0.25,100,0.25,4])`
+— wide on levels, tight on drifts (a near-diffuse initialisation).
+
+### 2.5 Correspondence to the source model, and documented deviations
+
+The constructor maps to the source transcription's numbered equations
+(GDP/Phillips + the labour-market/capital block are eqs 1–7 / 28–34, the
+IS term is eq 8, wapop's AR(1) is eq 34, the U/lpr/hpp/k cyclical
+measurement are eqs 30–33). Where the source is ambiguous, the following
+choices were made (all recorded in the `ModelSpec` docstring and
+`checkpoints/QUESTIONS.md`) — this is the checklist for a functional-form
+comparison against the original:
+
+- a **single** IS coefficient ν (eq 8 as written);
+- drift persistence fixed at **0.975** (z, k, w) / **0.95** (hpp, pr);
+- `lpr*` ≡ the participation trend `pr*` throughout;
+- the COVID-block measurement equations are applied over the whole
+  sample (with `d_t = 0` outside 2020–23 they reduce to eqs 1–7, except
+  wapop's AR(1));
+- the IS term is **dropped, not imputed**, when `r_{t−1}` or `r_{t−2}`
+  is unavailable;
+- trend/drift pairs use **contemporaneous drift**, giving the exact 2×2
+  SPD blocks in `Q` (§2.4);
+- **trimmed-mean inflation only** — no separate headline-CPI Phillips
+  equation, although one appears in the source Table 1 (owner ruling);
+- the gap AR(2) is reparameterised as `(φ_sum, φ_2)` with
+  `φ_1 = φ_sum − φ_2` (Rees 2019 prior parameterisation).
+
+Everything else is a textbook multivariate UC model in the
+Holston–Laubach–Williams / Chan–Koop–Potter tradition.
 
 ---
 
