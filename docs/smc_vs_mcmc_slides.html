@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is SMC? An intuitive guide</title>
+<style>
+  :root {
+    --surface: #fbfbf9;
+    --panel: #ffffff;
+    --ink: #171c22;
+    --ink-2: #565d66;
+    --ink-3: #8a919a;
+    --line: #e3e5e1;
+    --mcmc: #eb6834;
+    --smc: #2a78d6;
+    --smc-soft: rgba(42, 120, 214, 0.09);
+    --mcmc-soft: rgba(235, 104, 52, 0.08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --surface: #16181b; --panel: #1d2024; --ink: #eef0ee; --ink-2: #a9b0b8; --ink-3: #7c838b;
+      --line: #33373c; --mcmc: #d95926; --smc: #3987e5;
+      --smc-soft: rgba(57, 135, 229, 0.15); --mcmc-soft: rgba(217, 89, 38, 0.13);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #16181b; --panel: #1d2024; --ink: #eef0ee; --ink-2: #a9b0b8; --ink-3: #7c838b;
+    --line: #33373c; --mcmc: #d95926; --smc: #3987e5;
+    --smc-soft: rgba(57, 135, 229, 0.15); --mcmc-soft: rgba(217, 89, 38, 0.13);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --surface: #fbfbf9; --panel: #ffffff; --ink: #171c22; --ink-2: #565d66; --ink-3: #8a919a;
+    --line: #e3e5e1; --mcmc: #eb6834; --smc: #2a78d6;
+    --smc-soft: rgba(42, 120, 214, 0.09); --mcmc-soft: rgba(235, 104, 52, 0.08);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface); color: var(--ink);
+    font: 16.5px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+  .deck { max-width: 960px; margin: 0 auto; padding: 44px 24px 60px; display: flex; flex-direction: column; gap: 36px; }
+  .slide {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 46px 52px 42px;
+  }
+  .eyebrow {
+    font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 12px; font-weight: 600;
+  }
+  h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: 2rem; line-height: 1.17; font-weight: 600; margin: 0 0 18px;
+    max-width: 28ch; text-wrap: balance;
+  }
+  .lede { font-size: 1.06rem; color: var(--ink); max-width: 62ch; margin: 0 0 8px; }
+  .lede + .lede { margin-top: 10px; }
+  .muted { color: var(--ink-2); }
+  .num { font-variant-numeric: tabular-nums; }
+  figure { margin: 26px 0 8px; }
+  figure svg { display: block; max-width: 100%; height: auto; }
+  figcaption { font-size: 0.82rem; color: var(--ink-3); margin-top: 10px; }
+
+  .callout {
+    margin: 22px 0 0; padding: 13px 18px; border-left: 3px solid var(--smc);
+    background: var(--smc-soft); border-radius: 0 6px 6px 0; font-size: 0.97rem;
+    max-width: 66ch;
+  }
+  .callout.warm { border-left-color: var(--mcmc); background: var(--mcmc-soft); }
+
+  /* three-moves row */
+  .moves { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin: 24px 0 4px; }
+  @media (max-width: 760px) { .moves { grid-template-columns: 1fr; } }
+  .move { border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 14px; }
+  .move .step {
+    font-size: 0.7rem; letter-spacing: 0.13em; text-transform: uppercase; font-weight: 700;
+    color: var(--smc); margin: 0 0 4px;
+  }
+  .move h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .move p { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
+  .move svg { display: block; margin: 10px 0 12px; }
+
+  /* worked example two-columns */
+  .paircols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 22px 0 0; }
+  @media (max-width: 760px) { .paircols { grid-template-columns: 1fr; } }
+  .pcol { border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px 14px; }
+  .pcol.warm { background: var(--mcmc-soft); }
+  .pcol.cool { background: var(--smc-soft); }
+  .pcol h3 { margin: 0 0 10px; font-size: 1.02rem; }
+  .pcol.warm h3 { color: var(--mcmc); }
+  .pcol.cool h3 { color: var(--smc); }
+  .pcol ol { margin: 0; padding-left: 20px; }
+  .pcol li { margin: 7px 0; font-size: 0.91rem; }
+  .pcol .fine { font-size: 0.82rem; color: var(--ink-2); margin: 10px 0 0; }
+
+  /* comparison table */
+  table { border-collapse: collapse; width: 100%; margin: 20px 0 4px; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 10px 14px; vertical-align: top; }
+  thead th {
+    font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+    border-bottom: 2px solid var(--line); font-weight: 700;
+  }
+  thead th.mh { color: var(--mcmc); }
+  thead th.smc { color: var(--smc); }
+  tbody td { border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink-2); font-size: 0.85rem; width: 18%; padding-top: 12px; }
+  .wrap-x { overflow-x: auto; }
+
+  @media print { .slide { break-inside: avoid; } body { background: #fff; } }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- ============ SLIDE 1 : MH ============ -->
+  <section class="slide">
+    <p class="eyebrow">1 &#183; Where we start: Metropolis&#8211;Hastings</p>
+    <h2>MH is one hiker mapping a mountain range in fog</h2>
+    <p class="lede">The posterior is a landscape over the parameters: high ground = parameter values that explain the data well. We can measure the altitude anywhere we stand, but we can&#8217;t see the whole map.</p>
+    <p class="lede">MH sends out <strong>one hiker</strong>. At each step they propose a small random move; uphill moves are accepted, downhill moves sometimes accepted (so they don&#8217;t get stuck on the first bump). Record every position visited &#8212; after enough steps, the trail itself traces out the map: more time spent where the posterior is high.</p>
+    <figure>
+      <svg width="620" height="120" viewBox="0 0 620 120" aria-hidden="true">
+        <path d="M10 105 C 110 100, 150 45, 230 42 C 290 40, 320 78, 380 80 C 450 82, 490 30, 560 26 L 610 24"
+              fill="none" stroke="var(--ink-3)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <path d="M30 96 L58 84 L74 92 L102 66 L126 76 L150 56 L172 62 L198 48 L216 56 L236 46 L258 58 L282 52 L306 70 L330 64 L352 76 L378 70 L404 62 L428 48 L452 54 L478 38 L502 44 L528 32 L556 36 L584 28"
+              fill="none" stroke="var(--mcmc)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="584" cy="28" r="4.5" fill="var(--mcmc)"/>
+      </svg>
+      <figcaption>Dashed line: the (invisible) posterior landscape. Orange: the hiker&#8217;s trail, one step at a time.</figcaption>
+    </figure>
+    <div class="callout warm">The catch: every step depends on the previous one. The hiker must <em>personally walk</em> to every region that matters, the early wandering must be thrown away (&#8220;burn-in&#8221;), and consecutive positions are nearly identical &#8212; so a million steps can contain only a few thousand steps&#8217; worth of real information. And a walk can&#8217;t be parallelised.</div>
+  </section>
+
+  <!-- ============ SLIDE 2 : SMC idea ============ -->
+  <section class="slide">
+    <p class="eyebrow">2 &#183; The SMC idea</p>
+    <h2>SMC is a crowd, solving a sequence of easier problems</h2>
+    <p class="lede">Instead of one hiker on the <em>hard</em> problem, SMC uses <strong>thousands of guesses at once</strong> (&#8220;particles&#8221; &#8212; we use 2,000) and never asks them to solve the hard problem directly.</p>
+    <p class="lede">It builds a <strong>bridge of intermediate problems</strong>. Start from the prior &#8212; trivially easy, we can draw from it exactly. Then turn the data&#8217;s influence up gradually: target &#8733; prior &#215; likelihood<sup>&#966;</sup>, with the dial &#966; moving from 0 (data off) to 1 (the true posterior). Each notch of the dial changes the landscape only slightly &#8212; so the crowd only ever has to adapt a little.</p>
+    <figure>
+      <svg width="620" height="130" viewBox="0 0 620 130" aria-hidden="true">
+        <g fill="var(--smc)" opacity="0.3">
+          <circle cx="40" cy="24" r="5"/><circle cx="88" cy="70" r="5"/><circle cx="24" cy="56" r="5"/>
+          <circle cx="70" cy="40" r="5"/><circle cx="52" cy="88" r="5"/><circle cx="96" cy="30" r="5"/>
+          <circle cx="30" cy="92" r="5"/><circle cx="78" cy="98" r="5"/>
+        </g>
+        <g fill="var(--smc)" opacity="0.62">
+          <circle cx="282" cy="42" r="5"/><circle cx="312" cy="66" r="5"/><circle cx="266" cy="66" r="5"/>
+          <circle cx="330" cy="48" r="5"/><circle cx="298" cy="84" r="5"/><circle cx="318" cy="30" r="5"/>
+          <circle cx="278" cy="24" r="5"/><circle cx="288" cy="102" r="5"/>
+        </g>
+        <g fill="var(--smc)">
+          <circle cx="540" cy="52" r="5"/><circle cx="556" cy="66" r="5"/><circle cx="528" cy="64" r="5"/>
+          <circle cx="560" cy="50" r="5"/><circle cx="544" cy="76" r="5"/><circle cx="534" cy="42" r="5"/>
+          <circle cx="566" cy="60" r="5"/><circle cx="550" cy="88" r="5"/>
+        </g>
+        <path d="M126 60 h108 M356 60 h140" stroke="var(--ink-3)" stroke-width="1.6"/>
+        <path d="M226 54 l9 6 -9 6 M488 54 l9 6 -9 6" fill="none" stroke="var(--ink-3)" stroke-width="1.6"/>
+        <text x="60" y="124" text-anchor="middle" font-size="12" fill="var(--ink-3)">&#966; = 0 &#8201;(prior)</text>
+        <text x="298" y="124" text-anchor="middle" font-size="12" fill="var(--ink-3)">&#966; = 0.5</text>
+        <text x="547" y="124" text-anchor="middle" font-size="12" fill="var(--ink-3)">&#966; = 1 &#8201;(posterior)</text>
+      </svg>
+      <figcaption>The whole cloud is gradually pulled from the diffuse prior onto the concentrated posterior.</figcaption>
+    </figure>
+    <div class="callout">Think <strong>annealing</strong>: you don&#8217;t quench hot metal into its final shape in one shock &#8212; you cool it in small steps so the structure can keep re-equilibrating. &#966; is the temperature dial, and the algorithm chooses each notch adaptively: small enough that the crowd never falls badly out of step with the landscape.</div>
+  </section>
+
+  <!-- ============ SLIDE 3 : the three moves ============ -->
+  <section class="slide">
+    <p class="eyebrow">3 &#183; One notch of the dial</p>
+    <h2>Each step is the same three moves: weigh, select, explore</h2>
+    <div class="moves">
+      <div class="move">
+        <p class="step">1 &#183; Reweight</p>
+        <svg width="180" height="56" viewBox="0 0 180 56" aria-hidden="true">
+          <circle cx="24" cy="28" r="4" fill="var(--smc)" opacity="0.35"/>
+          <circle cx="58" cy="28" r="9" fill="var(--smc)"/>
+          <circle cx="94" cy="28" r="6" fill="var(--smc)" opacity="0.7"/>
+          <circle cx="126" cy="28" r="3" fill="var(--smc)" opacity="0.3"/>
+          <circle cx="156" cy="28" r="7" fill="var(--smc)" opacity="0.85"/>
+        </svg>
+        <h3>Score every particle</h3>
+        <p>Turn the dial one notch and ask: how well does each guess explain the extra slice of data-influence just added? Good fits gain weight, poor fits lose it. No one moves yet.</p>
+      </div>
+      <div class="move">
+        <p class="step">2 &#183; Resample</p>
+        <svg width="180" height="56" viewBox="0 0 180 56" aria-hidden="true">
+          <g fill="var(--smc)">
+            <circle cx="50" cy="18" r="5"/><circle cx="60" cy="30" r="5"/><circle cx="46" cy="38" r="5"/>
+            <circle cx="130" cy="22" r="5"/><circle cx="140" cy="34" r="5"/>
+          </g>
+          <g fill="var(--ink-3)" opacity="0.35">
+            <path d="M16 24 l8 8 M24 24 l-8 8" stroke="var(--ink-3)" stroke-width="2"/>
+            <path d="M96 20 l8 8 M104 20 l-8 8" stroke="var(--ink-3)" stroke-width="2"/>
+            <path d="M164 30 l8 8 M172 30 l-8 8" stroke="var(--ink-3)" stroke-width="2"/>
+          </g>
+        </svg>
+        <h3>Clone the fit, drop the unfit</h3>
+        <p>When weights get too uneven, resample: particles are duplicated in proportion to their weight and the rest are discarded. Survival of the fittest &#8212; the crowd concentrates where the evidence points.</p>
+      </div>
+      <div class="move">
+        <p class="step">3 &#183; Mutate</p>
+        <svg width="180" height="56" viewBox="0 0 180 56" aria-hidden="true">
+          <g stroke="var(--smc)" stroke-width="1.6" fill="none" opacity="0.75">
+            <path d="M40 30 l12 -8"/><path d="M40 30 l10 10"/><path d="M96 24 l-11 9"/><path d="M96 24 l13 6"/><path d="M146 34 l9 -10"/>
+          </g>
+          <g fill="var(--smc)">
+            <circle cx="40" cy="30" r="4.5"/><circle cx="96" cy="24" r="4.5"/><circle cx="146" cy="34" r="4.5"/>
+          </g>
+          <g fill="var(--smc)" opacity="0.45">
+            <circle cx="52" cy="22" r="4.5"/><circle cx="50" cy="40" r="4.5"/><circle cx="85" cy="33" r="4.5"/><circle cx="109" cy="30" r="4.5"/><circle cx="155" cy="24" r="4.5"/>
+          </g>
+        </svg>
+        <h3>Let everyone take a short walk</h3>
+        <p>Cloning leaves duplicates, so each particle takes a few small MH steps to spread back out and explore locally. <strong>This is where MH lives inside SMC</strong> &#8212; demoted from the whole algorithm to a short refresh.</p>
+      </div>
+    </div>
+    <div class="callout">The division of labour is the key intuition: <strong>tempering does the global work</strong> (finding the right region happens gradually, as a population), so <strong>MH only ever does local work</strong> (a few steps to restore diversity). Nobody has to walk across the whole mountain range any more. A bonus: those short walks run independently for every particle &#8212; perfectly parallel.</div>
+  </section>
+
+  <!-- ============ SLIDE 4 : worked example ============ -->
+  <section class="slide">
+    <p class="eyebrow">4 &#183; A toy example</p>
+    <h2>Estimating one mean, both ways</h2>
+    <p class="lede">The model: five observations <span class="num">y = {1.2, 2.6, 1.5, 2.3, 1.4}</span>, each <span class="num">y<sub>i</sub> ~ N(&#952;, 1)</span>, and a prior belief <span class="num">&#952; ~ N(0, 2&#178;)</span>. Because this example is conjugate we know the true answer &#8212; the posterior is <strong class="num">N(1.71, 0.44&#178;)</strong> &#8212; so we can watch both methods find it.</p>
+    <figure>
+      <svg id="toy-curves" width="640" height="150" viewBox="0 0 640 150" aria-hidden="true"></svg>
+      <figcaption>Grey dashed: prior N(0,&#8201;2&#178;). Ticks: the five data points. Blue: the posterior N(1.71,&#8201;0.44&#178;) both methods must recover.</figcaption>
+    </figure>
+    <div class="paircols">
+      <div class="pcol warm">
+        <h3>MH gets there by walking</h3>
+        <ol>
+          <li>Start the hiker anywhere, say <span class="num">&#952; = 0</span>.</li>
+          <li>Propose a nudge: <span class="num">&#952;&#8202;&#8217; = 0.6</span>. The posterior is higher there (closer to the data) &#8594; <strong>accept</strong>.</li>
+          <li>Propose <span class="num">&#952;&#8202;&#8217; = 0.1</span>. Posterior is lower &#8594; accept only with probability = the height ratio (&#8776;&#8201;8%) &#8594; usually <strong>reject</strong>, stay put.</li>
+          <li>Repeat &#8776;&#8201;50,000 times. Throw away the first few thousand (the walk in from &#952;&#8201;=&#8201;0). The <strong>histogram of the trail</strong> &#8594; N(1.71, 0.44&#178;).</li>
+        </ol>
+        <p class="fine">Consecutive positions are nearly identical, so those 50,000 steps hold far fewer independent draws.</p>
+      </div>
+      <div class="pcol cool">
+        <h3>SMC gets there by breeding</h3>
+        <ol>
+          <li>Draw 1,000 particles <strong>directly from the prior</strong> N(0, 2&#178;) &#8212; an exact sample, no burn-in, spread from &#8722;5 to +5.</li>
+          <li>Turn the dial to <span class="num">&#966; = &#8531;</span>: weight each particle by likelihood<sup>&#8531;</sup>. Particles near 1.8 get heavy; a particle at &#8722;3 becomes worthless.</li>
+          <li><strong>Resample</strong>: the particle at 2.0 is cloned several times, the one at &#8722;3 disappears. A few small MH steps shake the clones apart.</li>
+          <li>Two more notches (<span class="num">&#966; = &#8532;, then 1</span>) and the <strong>cloud itself</strong> is N(1.71, 0.44&#178;) &#8212; done in a handful of stages.</li>
+        </ol>
+        <p class="fine">At every intermediate &#966;, the cloud is a good sample of that stage&#8217;s target &#8212; it is never asked to make a leap.</p>
+      </div>
+    </div>
+    <div class="callout">Same destination, opposite journeys: MH <strong>accumulates</strong> the posterior over time along one path; SMC <strong>morphs</strong> an entire sample of the prior into a sample of the posterior. On this toy problem both work fine &#8212; the differences bite when the landscape has ridges, plateaus and 69 dimensions.</div>
+  </section>
+
+  <!-- ============ SLIDE 5 : the contrast ============ -->
+  <section class="slide">
+    <p class="eyebrow">5 &#183; Side by side</p>
+    <h2>The same goal, opposite strategies</h2>
+    <div class="wrap-x">
+    <table>
+      <thead>
+        <tr><th></th><th class="mh">MH: one long walk</th><th class="smc">SMC: a guided crowd</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Explorers</td>
+          <td>One chain, millions of dependent steps</td>
+          <td>Thousands of particles, tens of stages</td>
+        </tr>
+        <tr>
+          <td>How the hard problem is tackled</td>
+          <td>Head-on: the walker faces the full posterior from step one</td>
+          <td>As a bridge: a sequence of slightly-harder problems, prior &#8594; posterior</td>
+        </tr>
+        <tr>
+          <td>Global vs local</td>
+          <td>The walk must do both &#8212; cross between regions <em>and</em> explore within them</td>
+          <td>Tempering + resampling handle global structure; MH steps only polish locally</td>
+        </tr>
+        <tr>
+          <td>Burn-in</td>
+          <td>Needed &#8212; early steps start in the wrong place and are discarded</td>
+          <td>None &#8212; the crowd starts as exact draws from the prior</td>
+        </tr>
+        <tr>
+          <td>Parallelism</td>
+          <td>Poor &#8212; a walk is inherently one-after-another</td>
+          <td>Natural &#8212; every particle&#8217;s likelihood and mutation is independent</td>
+        </tr>
+        <tr>
+          <td>Extras for free</td>
+          <td>&#8212;</td>
+          <td>The marginal likelihood (model evidence) drops out of the reweighting sums</td>
+        </tr>
+        <tr>
+          <td>When mixing is poor</td>
+          <td>Run (much) longer</td>
+          <td>More mutation steps, a finer &#966; bridge, or a better mutation kernel &#8212; each targetable separately</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout">One thing does <strong>not</strong> change: both methods target exactly the same posterior, and both rest on the same accept&#8211;reject logic &#8212; SMC just wraps it in a schedule that spares any single walker from doing the impossible.</div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var svg = document.getElementById('toy-curves');
+  if (!svg) return;
+  var W = 640, H = 150, pad = 14, base = H - 26;
+  var xmin = -6, xmax = 6;
+  function X(v) { return pad + (v - xmin) / (xmax - xmin) * (W - 2 * pad); }
+  function gauss(mu, sd, scale) {
+    var pts = [];
+    for (var v = xmin; v <= xmax + 1e-9; v += 0.08) {
+      var d = Math.exp(-0.5 * Math.pow((v - mu) / sd, 2)) / (sd * Math.sqrt(2 * Math.PI));
+      pts.push(X(v).toFixed(1) + ',' + (base - d * scale).toFixed(1));
+    }
+    return pts.join(' ');
+  }
+  function poly(points, strokeVar, width, dash) {
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    p.setAttribute('points', points);
+    p.setAttribute('fill', 'none');
+    p.style.stroke = strokeVar;
+    p.setAttribute('stroke-width', width);
+    if (dash) p.setAttribute('stroke-dasharray', dash);
+    svg.appendChild(p);
+  }
+  // baseline
+  poly(pad + ',' + base + ' ' + (W - pad) + ',' + base, 'var(--ink-3)', 1);
+  // prior N(0,2) and posterior N(1.714, 0.436); posterior damped so it fits
+  var scale = 110;
+  poly(gauss(0, 2, scale), 'var(--ink-3)', 1.6, '5 4');
+  poly(gauss(1.7142857, 0.4364, scale * 0.55), 'var(--smc)', 2.2);
+  // data ticks
+  [1.2, 2.6, 1.5, 2.3, 1.4].forEach(function (v) {
+    var t = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    t.setAttribute('x1', X(v)); t.setAttribute('x2', X(v));
+    t.setAttribute('y1', base + 3); t.setAttribute('y2', base + 12);
+    t.style.stroke = 'var(--ink)'; t.setAttribute('stroke-width', 2);
+    svg.appendChild(t);
+  });
+  // axis labels
+  [-4, -2, 0, 2, 4].forEach(function (v) {
+    var tx = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    tx.setAttribute('x', X(v)); tx.setAttribute('y', H - 2);
+    tx.setAttribute('text-anchor', 'middle'); tx.setAttribute('font-size', '11');
+    tx.style.fill = 'var(--ink-3)'; tx.textContent = v;
+    svg.appendChild(tx);
+  });
+})();
+</script>
+</body>
+</html>
