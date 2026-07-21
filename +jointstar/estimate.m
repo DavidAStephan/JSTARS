@@ -182,6 +182,9 @@ function results = estimate(dataFile, varargin)
 %                            params 78 -> 77) when flag is true.  DEFAULT
 %                            FALSE reproduces the prior phiy row byte-for-
 %                            byte (see jointstar.defaultPriors).
+%     'ESSTargetFrac' ([])   target ESS fraction for adaptive tempering;
+%                            default [] = runSMC's own default 0.5; higher =
+%                            smaller phi increments/more stages
 %
 %   Final-specification call (all owner rulings baked in; diagonal
 %   innovation covariance -- see CLAUDE.md "Owner rulings"):
@@ -218,6 +221,7 @@ ip.addParameter('FixSingletonKappa', false);
 ip.addParameter('PoolAcuteOnly', false);
 ip.addParameter('CovidDecay', false);
 ip.addParameter('DropPhiY', false);
+ip.addParameter('ESSTargetFrac', []);
 ip.parse(varargin{:});
 o = ip.Results;
 
@@ -297,6 +301,9 @@ opts = struct('NParticles', o.NParticles, 'MSteps', o.MSteps, ...
 % parameters must never be proposed
 if isfield(P, 'mutateIdx')
     opts.MutateIdx = P.mutateIdx;
+end
+if ~isempty(o.ESSTargetFrac)
+    opts.ESSTargetFrac = o.ESSTargetFrac;
 end
 
 out = jointstar.runSMC(prob, opts);

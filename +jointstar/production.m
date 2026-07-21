@@ -46,6 +46,10 @@ function out = production(dataFile)
 %       UNIDENTIFIED hyperparameters (79 -> 69 params). G=20-confirmed:
 %       convergence slightly better (rank Rhat 1.238 -> 1.188), structural
 %       economics and latent states within cross-seed noise.
+%     - ESSTargetFrac = 0.7: CHECKPOINT_16 mixing ladder, the best
+%       Rhat-per-minute lever -- smaller adaptive tempering increments
+%       (~29 -> ~40 stages), paired 10-seed max rank Rhat 1.208 -> 1.095
+%       at ~1.5x runtime (~9 min/seed).
 %   The sampler flags change only the proposal; PoolAcuteOnly changes the
 %   parameter set (69 params), so P below is built WITH the PoolAcuteOnly
 %   flag to match the clouds. NOTE: any pre-existing results/production/
@@ -107,10 +111,10 @@ function out = production(dataFile)
 %   q95) -- just type out.coefficients to view the pooled coefficient
 %   table directly.
 %
-%   Cost: ~7 min/seed (diagonal spec, WasteFree, N=2000, MSteps=2) --
-%   about 20 minutes wall-clock the first time all three seeds are
-%   missing.  Effectively instant on any later call, since each seed is
-%   skipped independently once
+%   Cost: ~9 min/seed (diagonal spec, WasteFree, ESSTargetFrac 0.7,
+%   N=2000, MSteps=2) -- about 30 minutes wall-clock the first time all
+%   three seeds are missing.  Effectively instant on any later call,
+%   since each seed is skipped independently once
 %   results/production/seed<s>/posterior_summary.csv exists.
 %
 %   See also jointstar.estimate, jointstar.validate,
@@ -135,7 +139,7 @@ for k = 1:numel(seeds)
         'PieObs', true, ...
         'MutationTransform', true, 'StructuredBlocks', true, ...
         'MStepsLadder', true, 'WasteFree', true, ...
-        'PoolAcuteOnly', true, 'OutDir', od);
+        'PoolAcuteOnly', true, 'ESSTargetFrac', 0.7, 'OutDir', od);
 end
 
 P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
