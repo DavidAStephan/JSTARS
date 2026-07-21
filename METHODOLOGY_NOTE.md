@@ -1,6 +1,6 @@
 # Methodology note: model, estimator, convergence, and precedents
 
-*Current as of CHECKPOINT_15 (2026-07-16). The production estimator is a
+*Current as of CHECKPOINT_16 (2026-07-21). The production estimator is a
 standard adaptive likelihood-tempering SMC sampler with a states-
 marginalized (Chan–Jeliazkov) linear-Gaussian likelihood, a diagonal
 innovation covariance, an unconstrained-coordinate block Metropolis
@@ -265,8 +265,8 @@ Holston–Laubach–Williams / Chan–Koop–Potter tradition.
 ### 2.6 Estimated coefficients (current production pool)
 
 The production estimates below are the **pooled 3-seed table**
-(`results/production/pooled_posterior.csv`, waste-free + PoolAcuteOnly
-configuration, 69 parameters, 2026-07-16). Per §7 this is an **inter-seed
+(`results/production/pooled_posterior.csv`, waste-free + PoolAcuteOnly +
+ESSTargetFrac 0.7 configuration, 69 parameters, 2026-07-21). Per §7 this is an **inter-seed
 uncertainty envelope**, not a converged posterior; the CSV is the source
 of truth and these numbers change when production is re-run. Columns are
 the pooled posterior **mean, sd, and 5/50/95% quantiles**.
@@ -275,76 +275,76 @@ the pooled posterior **mean, sd, and 5/50/95% quantiles**.
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| gamma1 | expectations weight (vs lagged π) | 0.501 | 0.069 | 0.385 | 0.500 | 0.612 |
-| gamma2 | Phillips slope (≤0) | −0.237 | 0.061 | −0.345 | −0.233 | −0.147 |
-| pistar | trend-inflation mean π̄ | 2.574 | 0.204 | 2.266 | 2.566 | 2.923 |
-| alphapi | π mean-reversion (post-1993) | 0.106 | 0.048 | 0.040 | 0.099 | 0.193 |
+| gamma1 | expectations weight (vs lagged π) | 0.498 | 0.064 | 0.394 | 0.498 | 0.604 |
+| gamma2 | Phillips slope (≤0) | −0.218 | 0.056 | −0.314 | −0.214 | −0.130 |
+| pistar | trend-inflation mean π̄ | 2.568 | 0.159 | 2.292 | 2.575 | 2.816 |
+| alphapi | π mean-reversion (post-1993) | 0.121 | 0.046 | 0.051 | 0.117 | 0.204 |
 
 **Output gap AR(2) and IS curve** (eq 1; φ1 = phisum − φ2 ≈ 1.33 implied):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| phisum | gap AR(2) persistence φ1+φ2 | 0.937 | 0.038 | 0.861 | 0.948 | 0.979 |
-| phi2 | gap AR(2) second lag | −0.394 | 0.169 | −0.623 | −0.427 | −0.069 |
-| nu | IS real-rate-gap coefficient | −0.015 | 0.028 | −0.068 | −0.011 | 0.025 |
+| phisum | gap AR(2) persistence φ1+φ2 | 0.965 | 0.017 | 0.933 | 0.968 | 0.989 |
+| phi2 | gap AR(2) second lag | −0.501 | 0.102 | −0.657 | −0.508 | −0.326 |
+| nu | IS real-rate-gap coefficient | −0.016 | 0.024 | −0.059 | −0.013 | 0.018 |
 
 **Labour-market and capital cyclical loadings / gap persistence**
 (eqs 3–7: Okun-type loadings on the gap `c`, plus each series' own AR(1)):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| xi1 | U on c_t | −0.300 | 0.062 | −0.404 | −0.300 | −0.200 |
-| xi2 | U on c_{t−1} | 0.025 | 0.095 | −0.122 | 0.021 | 0.192 |
-| rhoU | U-gap persistence | 0.700 | 0.107 | 0.523 | 0.702 | 0.874 |
-| theta1 | lpr on c_t | −0.035 | 0.081 | −0.167 | −0.036 | 0.096 |
-| theta2 | lpr on c_{t−1} | 0.118 | 0.084 | −0.024 | 0.120 | 0.256 |
-| rhopr | lpr-gap persistence | 0.847 | 0.096 | 0.676 | 0.855 | 0.983 |
-| lam1 | hpp on c_t | 0.247 | 0.123 | 0.028 | 0.254 | 0.439 |
-| lam2 | hpp on c_{t−1} | −0.071 | 0.159 | −0.305 | −0.086 | 0.220 |
-| rhohpp | hpp-gap persistence | 0.511 | 0.129 | 0.299 | 0.513 | 0.722 |
-| chi1 | k on c_t | 0.031 | 0.019 | 0.001 | 0.031 | 0.063 |
-| chi2 | k on c_{t−1} | 0.016 | 0.019 | −0.016 | 0.015 | 0.048 |
-| rhok | k-gap persistence | 0.976 | 0.021 | 0.935 | 0.982 | 0.997 |
-| rhow | wapop-gap persistence | 0.960 | 0.028 | 0.905 | 0.967 | 0.995 |
+| xi1 | U on c_t | −0.279 | 0.060 | −0.381 | −0.278 | −0.185 |
+| xi2 | U on c_{t−1} | 0.003 | 0.089 | −0.142 | 0.002 | 0.149 |
+| rhoU | U-gap persistence | 0.620 | 0.095 | 0.459 | 0.623 | 0.768 |
+| theta1 | lpr on c_t | −0.024 | 0.070 | −0.138 | −0.022 | 0.090 |
+| theta2 | lpr on c_{t−1} | 0.104 | 0.077 | −0.018 | 0.102 | 0.231 |
+| rhopr | lpr-gap persistence | 0.808 | 0.081 | 0.672 | 0.809 | 0.939 |
+| lam1 | hpp on c_t | 0.300 | 0.092 | 0.148 | 0.300 | 0.451 |
+| lam2 | hpp on c_{t−1} | −0.190 | 0.107 | −0.362 | −0.193 | −0.010 |
+| rhohpp | hpp-gap persistence | 0.599 | 0.121 | 0.405 | 0.596 | 0.799 |
+| chi1 | k on c_t | 0.036 | 0.018 | 0.008 | 0.036 | 0.067 |
+| chi2 | k on c_{t−1} | 0.005 | 0.017 | −0.022 | 0.005 | 0.032 |
+| rhok | k-gap persistence | 0.980 | 0.015 | 0.951 | 0.984 | 0.997 |
+| rhow | wapop-gap persistence | 0.962 | 0.026 | 0.911 | 0.968 | 0.995 |
 
 **Production function and trend growth** (τ* identity; ḡ constants):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| alpha | capital share a | 0.384 | 0.047 | 0.302 | 0.385 | 0.457 |
-| gzbar | mean productivity drift ḡ_z | 0.140 | 0.073 | 0.016 | 0.140 | 0.257 |
-| gwbar | mean population drift ḡ_w | 0.330 | 0.064 | 0.228 | 0.328 | 0.438 |
+| alpha | capital share a | 0.356 | 0.048 | 0.276 | 0.357 | 0.432 |
+| gzbar | mean productivity drift ḡ_z | 0.143 | 0.071 | 0.026 | 0.141 | 0.262 |
+| gwbar | mean population drift ḡ_w | 0.354 | 0.064 | 0.251 | 0.354 | 0.458 |
 
 **State innovation standard deviations** (`η_t`, §2.4):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| sig_c | output gap | 0.363 | 0.038 | 0.304 | 0.362 | 0.429 |
-| sig_Ustar | NAIRU | 0.097 | 0.015 | 0.075 | 0.096 | 0.123 |
-| sig_pie | trend inflation | 0.206 | 0.019 | 0.177 | 0.205 | 0.239 |
-| sig_z | z* level | 0.340 | 0.041 | 0.276 | 0.339 | 0.409 |
-| sig_gz | z* drift | 0.042 | 0.009 | 0.029 | 0.041 | 0.059 |
-| sig_k | k* level | 0.072 | 0.006 | 0.063 | 0.072 | 0.082 |
-| sig_gk | k* drift | 0.037 | 0.004 | 0.030 | 0.036 | 0.044 |
-| sig_w | w* level | 0.057 | 0.005 | 0.049 | 0.056 | 0.065 |
-| sig_gw | w* drift | 0.030 | 0.004 | 0.024 | 0.029 | 0.036 |
-| sig_hpp | hpp* level | 0.236 | 0.035 | 0.182 | 0.234 | 0.297 |
-| sig_ghpp | hpp* drift | 0.035 | 0.007 | 0.025 | 0.034 | 0.047 |
-| sig_pr | pr* level | 0.190 | 0.027 | 0.147 | 0.189 | 0.235 |
-| sig_gpr | pr* drift | 0.038 | 0.008 | 0.027 | 0.037 | 0.054 |
-| sig_xi | neutral-rate residual ξ | 0.134 | 0.036 | 0.087 | 0.128 | 0.199 |
+| sig_c | output gap | 0.363 | 0.039 | 0.303 | 0.362 | 0.429 |
+| sig_Ustar | NAIRU | 0.093 | 0.013 | 0.073 | 0.092 | 0.116 |
+| sig_pie | trend inflation | 0.206 | 0.018 | 0.178 | 0.205 | 0.238 |
+| sig_z | z* level | 0.318 | 0.039 | 0.257 | 0.317 | 0.383 |
+| sig_gz | z* drift | 0.041 | 0.009 | 0.028 | 0.039 | 0.056 |
+| sig_k | k* level | 0.071 | 0.005 | 0.064 | 0.071 | 0.080 |
+| sig_gk | k* drift | 0.035 | 0.004 | 0.028 | 0.034 | 0.042 |
+| sig_w | w* level | 0.057 | 0.004 | 0.050 | 0.057 | 0.065 |
+| sig_gw | w* drift | 0.029 | 0.004 | 0.024 | 0.029 | 0.035 |
+| sig_hpp | hpp* level | 0.219 | 0.029 | 0.174 | 0.217 | 0.270 |
+| sig_ghpp | hpp* drift | 0.033 | 0.006 | 0.024 | 0.033 | 0.045 |
+| sig_pr | pr* level | 0.183 | 0.026 | 0.141 | 0.183 | 0.226 |
+| sig_gpr | pr* drift | 0.035 | 0.007 | 0.025 | 0.034 | 0.048 |
+| sig_xi | neutral-rate residual ξ | 0.131 | 0.039 | 0.082 | 0.123 | 0.203 |
 
 **Measurement-error standard deviations** (`ε_t`, §2.4; diagonal R):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| sme_y | GDP | 0.246 | 0.025 | 0.207 | 0.245 | 0.291 |
-| sme_pi | inflation | 0.651 | 0.045 | 0.581 | 0.650 | 0.729 |
-| sme_w | wapop | 0.055 | 0.004 | 0.048 | 0.055 | 0.063 |
-| sme_U | unemployment | 0.118 | 0.012 | 0.098 | 0.118 | 0.139 |
-| sme_pr | participation | 0.223 | 0.026 | 0.182 | 0.222 | 0.266 |
-| sme_hpp | hours per person | 0.343 | 0.028 | 0.299 | 0.343 | 0.390 |
-| sme_k | capital | 0.057 | 0.005 | 0.049 | 0.057 | 0.066 |
+| sme_y | GDP | 0.256 | 0.025 | 0.218 | 0.254 | 0.300 |
+| sme_pi | inflation | 0.647 | 0.040 | 0.584 | 0.645 | 0.717 |
+| sme_w | wapop | 0.057 | 0.004 | 0.050 | 0.056 | 0.064 |
+| sme_U | unemployment | 0.115 | 0.012 | 0.096 | 0.114 | 0.136 |
+| sme_pr | participation | 0.222 | 0.023 | 0.186 | 0.222 | 0.259 |
+| sme_hpp | hours per person | 0.368 | 0.029 | 0.321 | 0.367 | 0.418 |
+| sme_k | capital | 0.056 | 0.004 | 0.050 | 0.056 | 0.064 |
 | sme_pieobs | π^e (fixed, owner ruling) | 0.300 | — | 0.300 | 0.300 | 0.300 |
 
 **COVID stringency loadings** (`φ_·` in the measurement intercepts;
@@ -352,51 +352,51 @@ the pooled posterior **mean, sd, and 5/50/95% quantiles**.
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| phiy | GDP stringency | −0.023 | 0.015 | −0.052 | −0.021 | −0.003 |
+| phiy | GDP stringency | −0.023 | 0.014 | −0.049 | −0.020 | −0.006 |
 | phiu | U stringency | −0.007 | 0.003 | −0.013 | −0.007 | −0.003 |
-| phipr | lpr stringency | −0.001 | 0.009 | −0.016 | −0.001 | 0.016 |
-| phihpp | hpp stringency | 0.006 | 0.020 | −0.027 | 0.007 | 0.037 |
-| phik | k stringency | 0.000 | 0.002 | −0.002 | 0.000 | 0.003 |
+| phipr | lpr stringency | −0.004 | 0.008 | −0.017 | −0.004 | 0.008 |
+| phihpp | hpp stringency | 0.014 | 0.016 | −0.012 | 0.014 | 0.039 |
+| phik | k stringency | 0.001 | 0.001 | −0.002 | 0.001 | 0.003 |
 
 **Volatility-break multipliers** (`m84_·` pre-1984, `m93_·` pre-1993):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| m84_y | GDP meas. sd, pre-1984 | 1.214 | 0.426 | 0.605 | 1.173 | 1.968 |
-| m84_z | z* shock sd, pre-1984 | 1.879 | 0.496 | 1.085 | 1.867 | 2.724 |
-| m84_c | gap shock sd, pre-1984 | 1.746 | 0.339 | 1.245 | 1.707 | 2.362 |
-| m93_pi | inflation meas. sd, pre-1993 | 1.714 | 0.225 | 1.375 | 1.696 | 2.120 |
-| m93_U | NAIRU shock sd, pre-1993 | 1.780 | 0.410 | 1.159 | 1.748 | 2.497 |
+| m84_y | GDP meas. sd, pre-1984 | 1.142 | 0.372 | 0.627 | 1.081 | 1.828 |
+| m84_z | z* shock sd, pre-1984 | 1.795 | 0.494 | 1.015 | 1.776 | 2.652 |
+| m84_c | gap shock sd, pre-1984 | 1.834 | 0.329 | 1.342 | 1.805 | 2.415 |
+| m93_pi | inflation meas. sd, pre-1993 | 1.746 | 0.205 | 1.435 | 1.733 | 2.115 |
+| m93_U | NAIRU shock sd, pre-1993 | 1.716 | 0.416 | 1.068 | 1.702 | 2.429 |
 
 **COVID variance-scale factors** (`κ ≥ 1`, right-skewed — read the median;
 kapc_2021 scales the gap *innovation*, the rest scale *measurement* sds):
 
 | param | window / series | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| kapc_2021 | gap innovation, 2020–21 | 4.433 | 1.931 | 1.837 | 4.197 | 7.851 |
-| kapy_20 | GDP, 2020 | 8.689 | 3.969 | 3.635 | 8.009 | 16.18 |
-| kapy_21 | GDP, 2021 | 4.271 | 1.725 | 1.815 | 4.066 | 7.356 |
-| kapu_20 | U, 2020 | 5.228 | 3.064 | 1.581 | 4.639 | 11.03 |
-| kapu_2122 | U, 2021–22 | 1.973 | 0.762 | 1.149 | 1.786 | 3.469 |
-| kappr_20 | lpr, 2020 | 10.51 | 3.201 | 6.444 | 9.955 | 16.61 |
-| kappr_2122 | lpr, 2021–22 | 2.907 | 0.849 | 1.786 | 2.765 | 4.530 |
-| kaphpp_2022 | hpp, 2020–22 | 4.175 | 1.091 | 2.636 | 4.049 | 6.221 |
-| kappop_2021 | wapop, 2020–21 | 5.473 | 1.594 | 3.234 | 5.258 | 8.366 |
-| kappi_2023 | inflation, 2020–23 | 2.176 | 0.484 | 1.533 | 2.097 | 3.071 |
-| kapk_20 | capital, 2020 | 3.740 | 2.051 | 1.522 | 3.269 | 7.467 |
-| kapk_21 | capital, 2021 | 2.301 | 0.885 | 1.326 | 2.078 | 3.961 |
+| kapc_2021 | gap innovation, 2020–21 | 4.110 | 2.209 | 1.244 | 3.733 | 8.346 |
+| kapy_20 | GDP, 2020 | 8.547 | 4.388 | 2.795 | 7.916 | 16.39 |
+| kapy_21 | GDP, 2021 | 4.315 | 1.624 | 2.024 | 4.087 | 7.332 |
+| kapu_20 | U, 2020 | 5.797 | 2.674 | 2.343 | 5.322 | 10.74 |
+| kapu_2122 | U, 2021–22 | 1.797 | 0.717 | 1.091 | 1.584 | 3.164 |
+| kappr_20 | lpr, 2020 | 11.05 | 3.950 | 6.400 | 10.25 | 18.64 |
+| kappr_2122 | lpr, 2021–22 | 2.564 | 0.764 | 1.569 | 2.435 | 4.008 |
+| kaphpp_2022 | hpp, 2020–22 | 3.674 | 0.891 | 2.495 | 3.541 | 5.303 |
+| kappop_2021 | wapop, 2020–21 | 5.171 | 1.356 | 3.265 | 5.020 | 7.644 |
+| kappi_2023 | inflation, 2020–23 | 2.271 | 0.492 | 1.604 | 2.200 | 3.190 |
+| kapk_20 | capital, 2020 | 3.035 | 1.777 | 1.303 | 2.572 | 6.446 |
+| kapk_21 | capital, 2021 | 1.800 | 0.716 | 1.076 | 1.597 | 3.210 |
 
 **COVID-κ hierarchy hyperparameters** (2020 acute group only, under
 `PoolAcuteOnly`; log-mean and log-shape of the shared truncated Gamma):
 
 | param | meaning | mean | sd | 5% | 50% | 95% |
 |---|---|---|---|---|---|---|
-| kapHyp_lm_w2020 | log-mean, 2020 group | 1.616 | 0.357 | 1.000 | 1.634 | 2.152 |
-| kapHyp_la_w2020 | log-shape, 2020 group | 0.573 | 0.567 | −0.364 | 0.571 | 1.523 |
+| kapHyp_lm_w2020 | log-mean, 2020 group | 1.580 | 0.341 | 1.011 | 1.596 | 2.127 |
+| kapHyp_la_w2020 | log-shape, 2020 group | 0.559 | 0.553 | −0.367 | 0.574 | 1.442 |
 
-Reading notes: γ2 ≈ −0.24 is the (weakly identified, prior-influenced)
-Phillips slope; the gap is highly persistent (φ_sum ≈ 0.94) with a
-negative second lag; the IS coefficient ν is small and its interval
+Reading notes: γ2 ≈ −0.22 is the (weakly identified, prior-influenced)
+Phillips slope; the gap is highly persistent (φ_sum ≈ 0.97) with a
+negative second lag (φ_2 ≈ −0.50); the IS coefficient ν is small and its interval
 spans zero; the capital-gap and wapop-gap persistences (ρ_k ≈ 0.98,
 ρ_w ≈ 0.96) are near unit-root; the COVID measurement scales are large
 and right-skewed (informed by ~8 quarters — read the median, and see the
@@ -469,8 +469,12 @@ A cloud of `N = 2000` particles `{θ^(i)}` is carried from the prior
 2. **Choose φ_n adaptively** by 1-D bisection so the post-reweighting
    effective sample size hits a target fraction of `N`:
    ```
-   ESS(φ_n) = (Σ_i w_n^(i))² / Σ_i (w_n^(i))²  =  γ · N,   γ = 0.5.
+   ESS(φ_n) = (Σ_i w_n^(i))² / Σ_i (w_n^(i))²  =  γ · N.
    ```
+   Production uses γ = 0.7 (CHECKPOINT_16: the best R̂-per-minute lever
+   of the mixing ladder — smaller φ increments, ~40 stages instead of
+   ~29, paired 10-seed max rank R̂ 1.208 → 1.095 at ~1.5× runtime); the
+   sampler default is γ = 0.5.
 3. **Resample** (systematic) whenever `ESS ≤ γN`.
 4. **Mutate**: `M_stage` sweeps of block random-walk Metropolis with
    invariant density `π_n` (§4.2–4.4).
@@ -681,8 +685,14 @@ log-posterior profiles show no density valley between seed clouds). The
 tuning refinements close most of it: the transformed kernel + structured
 blocks + ladder took `max(bulk,folded) R̂` from ~5.8 to ~1.55 at G=20,
 and **waste-free mutation** took it to **≈1.19–1.24 at G=20** (median
-`N_eff ≈ 8`) — the residual disagreement is now at the level any
-published SMC estimator carries. Much of the historically-quoted
+`N_eff ≈ 8`). The CHECKPOINT_16 mixing ladder then quantified the
+remaining levers ("more draws" analogues): raising the tempering ESS
+target to γ = 0.7 — adopted in production — brought the paired 10-seed
+max rank R̂ to **1.095** (and the noisy 3-seed classical statistic on the
+production pool itself to 1.20), while doubling `MSteps` was the
+N_eff-per-run maximiser (~8×) and doubling particles was confirmed the
+weakest lever. The residual disagreement is at the level any published
+SMC estimator carries, concentrated in the weak-ID COVID-κ block. Much of the historically-quoted
 "`R̂ = 2.2`" was small-sample noise in a 3-seed maximum; at G=20 with
 rank-normalization the honest figure is far lower.
 
@@ -737,7 +747,7 @@ Vehtari et al. (2021). Every ingredient is standard and published.
 
 | Design choice | Ours (`runSMC.m`) | Herbst–Schorfheide 2014/15 | NY Fed SMC.jl (Cai et al. 2021) | Dynare `hssmc` |
 |---|---|---|---|---|
-| Tempering schedule | adaptive: bisection so post-reweight ESS = 0.5·N | fixed φ_n=(n/N_φ)^λ | both; adaptive targets ESS ratio | fixed (n/N_φ)^λ |
+| Tempering schedule | adaptive: bisection so post-reweight ESS = γ·N (γ=0.7 production, 0.5 default) | fixed φ_n=(n/N_φ)^λ | both; adaptive targets ESS ratio | fixed (n/N_φ)^λ |
 | Resampling | systematic, trigger ESS ≤ 0.5·N | multinomial baseline | systematic default, threshold 0.5 | — |
 | Mutation | block RW-MH, structured+random partitions, **unconstrained coords + Jacobian**, cloud covariance | blocked RW-MH, random partitions, cloud covariance | blocked RW-MH, cloud covariance | RW-MH |
 | Waste-free | **yes (Dau–Chopin 2022), budget-parity** | no | no | no |

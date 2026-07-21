@@ -104,7 +104,8 @@ code yourself — delegate it to the appropriate sub-agent below.
   **coefficient table** (pooled_posterior.csv — param, mean, sd,
   5/50/95%; also returned as `out.coefficients`; 79 params),
   convergence_rhat.csv, and smoothed_states.csv. Idempotent/resumable
-  (skips seeds already computed). ~6 min/seed diagonal, ~20 min cold.
+  (skips seeds already computed). ~9 min/seed (ESSTargetFrac 0.7,
+  CHECKPOINT_16), ~30 min cold.
   This bakes in the Convergence discipline below so no one has to
   assemble the pooled recipe by hand. (Table-3-vs-baseline validation
   was removed from the production flow; `jointstar.validate` remains as
@@ -153,7 +154,7 @@ code yourself — delegate it to the appropriate sub-agent below.
   horseshoe layer; the RidgeAtoms finding stays in CHECKPOINT_09.)
 - **Timing note**: the eval-cache and TIMING-TRAP numbers above were
   measured on the *horseshoe* spec (~410 params, ~27–45 min/seed). The
-  current **diagonal** model is much cheaper — ~6 min/seed, ~20 min for
+  current **diagonal** model is much cheaper — ~9 min/seed, ~30 min for
   the 3-seed pool. The eval-cache still applies and is still
   bitwise-verified on the diagonal path.
 - **MATLAB**: R2026a at `/Applications/MATLAB_R2026a.app/bin/matlab`
