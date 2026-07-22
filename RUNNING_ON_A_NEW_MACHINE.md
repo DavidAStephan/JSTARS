@@ -13,8 +13,8 @@ machine are set *when you call* `estimate`, not inside it.
   thread for the duration of the run and restores your session afterward
   (measured ~2.4x speedup; the benefit grows with core count). Automatic.
 - **Parallel Computing Toolbox subscription.** If the PCT is not licensed
-  (`estimate.m:153`), it falls back to serial with a warning instead of
-  erroring. Automatic.
+  (`estimate.m`'s `openPool()`, ~line 337), it falls back to serial with a
+  warning instead of erroring. Automatic.
 
 ## What you set per machine — at the call site, not in the file
 
@@ -50,7 +50,7 @@ processes, separate memory bandwidth); below that, Threads has lower
 overhead. To switch, change the one line in `openPool()`:
 
 ```matlab
-% estimate.m, ~line 157
+% estimate.m, openPool(), ~line 341
 pool = parpool('Threads');        % <- default
 pool = parpool('Processes');      % <- alternative; try on 16+ workers
 ```
@@ -62,22 +62,36 @@ the *only* change needed. Benchmark both on your machine with a short run
 ## Recommended production run (any machine)
 
 Because the posterior sits on ridges (see `checkpoints/CHECKPOINT_08.md`),
-run **≥3 independent seeds and pool them** rather than trusting one run:
+run **≥3 independent seeds and pool them** rather than trusting one run —
+but don't hand-loop this yourself.  `jointstar.production` already bakes in
+the exact current recipe (seeds, flags, `ESSTargetFrac`, pooling, and
+R-hat), so it is the only call you need:
 
 ```matlab
-parpool('Threads', 32);                  % open once, reused across calls
-for s = [42 7 101]
-    jointstar.estimate('your_data.csv', 'Seed', s, ...
-        'OutDir', sprintf('results/production/seed%d', s), ...
-        'HierKappa', true);
-end
-% then pool + diagnose:
-%   benchmarks/runConvergenceCheck.m  (R-hat across seeds)
-%   benchmarks/poolRuns.m             (results/production/pooled_posterior.csv)
+parpool('Threads', 32);                  % optional: open once, reused
+out = jointstar.production('your_data.csv');
 ```
 
-Seeds are embarrassingly parallel, so three full runs still fit the
-30-minute budget on 32 workers.
+It is idempotent/resumable (skips any seed whose `OutDir` already has
+`posterior_summary.csv`) and writes the pooled coefficient table, the
+cross-seed R-hat table, the pooled smoothed states, and `provenance.json`
+to `results/production/`.
+
+**Do not** hand-loop `jointstar.estimate` over the seeds yourself with a
+partial flag set (e.g. `'HierKappa', true` alone) and then call
+`benchmarks/runConvergenceCheck.m` / `benchmarks/poolRuns.m` on the
+result — those old standalone scripts pool whatever is sitting in
+`results/production/seed<s>`, so a manually-run, differently-configured
+seed silently poisons the exact directories `jointstar.production` trusts.
+If `results/production/` already contains seed directories from an
+earlier configuration (fewer flags, different `ESSTargetFrac`, a
+different parameter count), delete or move them before calling
+`jointstar.production` fresh: a seed directory carrying a `provenance.json`
+from a mismatched configuration makes the new provenance check at pooling
+time **error** (data-vintage/config mismatch across seeds); an older,
+pre-provenance seed directory (no `provenance.json`) only gets a
+**warning**, not an error, so a stale mix can still slip through silently
+unless you check first.
 
 ## Sanity check after moving
 

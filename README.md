@@ -21,16 +21,20 @@ series as direct trend measurements.
 ```matlab
 out = jointstar.production('data.csv');   % run from the repo root
 ```
-Runs the full diagonal-covariance spec from 3 seeds (42/7/101), pools them
-into the quotable posterior, and writes the **coefficient table**
-(`out.coefficients` / `results/production/pooled_posterior.csv`), R̂
-convergence, and smoothed states to `results/production/`. ~80 min on 6
-cores; idempotent (skips seeds already computed). The lower-level
-`jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed', 42, 'HierKappa',
-true)` runs a single seed for A/B and diagnostics. 79 parameters; cross-seed
-R̂ is elevated on ridge parameters (max ~5.8) — a mixing property of the
-posterior, not something the diagonal-vs-horseshoe choice fixes or causes;
-r* ends the sample at 0.73%.
+Runs the full diagonal-covariance spec from 3 seeds (42/7/101, flags
+HierKappa+PieObs+MutationTransform+StructuredBlocks+MStepsLadder+
+WasteFree+PoolAcuteOnly, ESSTargetFrac=0.7), pools them into the quotable
+posterior, and writes the **coefficient table** (`out.coefficients` /
+`results/production/pooled_posterior.csv`), R̂ convergence, smoothed
+states, and `provenance.json` to `results/production/`. ~9 min/seed, ~30
+min cold on 6 cores; idempotent (skips seeds already computed). The
+lower-level `jointstar.estimate('data.csv', 'NParticles', 2000, 'Seed',
+42, 'HierKappa', true)` runs a single seed for A/B and diagnostics. 69
+parameters; cross-seed R̂ is elevated on ridge parameters in the
+classical formula, though the field-standard G=20 rank-folded check
+(`benchmarks/computeNeff.m`) is much better behaved (~1.22) — a mixing
+property of the posterior, not something the diagonal-vs-horseshoe
+choice fixes or causes; r* ends the sample at 0.68%.
 
 Checkpoint history + owner rulings: `checkpoints/`. Spec-decision switches
 live in `defaultPriors.m` (sign restrictions, calibrated 30bp).
@@ -41,7 +45,10 @@ live in `defaultPriors.m` (sign restrictions, calibrated 30bp).
 +jointstar/          the package: ModelSpec, computeLogLik, drawStates,
                       runSMC, mhMutate, diagnostics
 tests/                matlab.unittest suite; run with runtests('tests')
-benchmarks/           benchJointstarSize.m — timing at full model size
+benchmarks/           runNeffG20.m + computeNeff.m (G=20 convergence),
+                      verifyCacheEquivalence.m (eval-cache correctness),
+                      runConvergenceCheck.m / poolRuns.m (standalone
+                      diagnostics -- jointstar.production is canonical)
 checkpoints/          CHECKPOINT_XX.md summaries + QUESTIONS.md
 results/              production posteriors, R̂ convergence, smoothed states
 startup.m             paths, RNG, optional parpool
@@ -51,8 +58,7 @@ startup.m             paths, RNG, optional parpool
 
 ```matlab
 startup                          % run from the repo root; startup(8) opens a parpool
-runtests('tests')                 % full validation suite (~5 s)
-benchJointstarSize                % timing at JointSTAR size
+runtests('tests')                 % full validation suite (111 tests)
 ```
 
 The estimation machinery is generic: `computeLogLik`/`drawStates` consume the

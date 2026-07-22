@@ -72,7 +72,7 @@ code yourself — delegate it to the appropriate sub-agent below.
 ## Project context
 
 - **Toolbox**: custom precision-based Bayesian SMC estimator in
-  `jointstar/+jointstar/` — NOT the Econometrics Toolbox `ssm`/`estimate`
+  `+jointstar/` at the repo root — NOT the Econometrics Toolbox `ssm`/`estimate`
   and NOT a classical Kalman-filter MLE. It combines Chan-Jeliazkov
   (2009) sparse-precision state marginalization as the likelihood
   evaluator inside a Herbst-Schorfheide (2014) adaptive-tempering SMC
@@ -99,12 +99,17 @@ code yourself — delegate it to the appropriate sub-agent below.
   option any more.
 - **PRODUCTION COMMAND (use this)**: `jointstar.production('data.csv')`
   — the single, no-options entry point. Runs the diagonal spec from 3
-  seeds (42/7/101, N=2000, MSteps=2, HierKappa+PieObs, eval cache on),
-  pools them, and writes everything to `results/production/`: the
-  **coefficient table** (pooled_posterior.csv — param, mean, sd,
-  5/50/95%; also returned as `out.coefficients`; 79 params),
-  convergence_rhat.csv, and smoothed_states.csv. Idempotent/resumable
-  (skips seeds already computed). ~9 min/seed (ESSTargetFrac 0.7,
+  seeds (42/7/101, N=2000, MSteps=2, flags HierKappa+PieObs+
+  MutationTransform+StructuredBlocks+MStepsLadder+WasteFree+
+  PoolAcuteOnly, ESSTargetFrac=0.7, eval cache on), pools them, and
+  writes everything to `results/production/`: the **coefficient table**
+  (pooled_posterior.csv — param, mean, sd, 5/50/95%; also returned as
+  `out.coefficients`; 69 params), convergence_rhat.csv,
+  smoothed_states.csv, and provenance.json (data-vintage/config hash;
+  verified for agreement across the pooled seeds at pooling time — a
+  seed dir estimated on a different data.csv or config errors, a
+  pre-provenance seed dir only warns). Idempotent/resumable (skips
+  seeds already computed). ~9 min/seed (ESSTargetFrac 0.7,
   CHECKPOINT_16), ~30 min cold.
   This bakes in the Convergence discipline below so no one has to
   assemble the pooled recipe by hand. (Table-3-vs-baseline validation
@@ -161,8 +166,8 @@ code yourself — delegate it to the appropriate sub-agent below.
   (confirmed **not** on `PATH` — sub-agents must call the full path,
   e.g. `/Applications/MATLAB_R2026a.app/bin/matlab -batch "..."`). 6-core
   Home license, Parallel Computing Toolbox licensed (Threads pool
-  works). Tests: `runtests('tests')` from the repo root (53
-  tests green as of CHECKPOINT_13, incl. the MStepsLadder /
+  works). Tests: `runtests('tests')` from the repo root (111
+  tests green as of CHECKPOINT_16, incl. the MStepsLadder /
   GTrendRotation / RateGapAR flag tests).
 
 ## Convergence discipline (read before estimating or judging any result)
@@ -242,10 +247,15 @@ From `checkpoints/CHECKPOINT_10.md` / `CHECKPOINT_11.md`:
   `GTrendRotation` (gzbar/gwbar sum/split) made things WORSE (2.68,
   prediction refuted — keep dormant); `RateGapAR` (stationary AR ξ)
   left convergence unchanged, data pushes rho_rg → 1, and it makes
-  the output gap MORE persistent/drifty — keep dormant. AWAITING
-  OWNER SIGN-OFF to enable the three winning flags in `production.m`
-  and regenerate the quotable table (moves γ2 −0.157 → ≈ −0.25).
-  The ≥3-seed pool remains mandatory.
+  the output gap MORE persistent/drifty — keep dormant. ADOPTED into
+  `production.m` at CHECKPOINT_14-16, along with WasteFree SMC
+  (CHECKPOINT_14), PoolAcuteOnly (CHECKPOINT_15, 79 → 69 params), and
+  ESSTargetFrac=0.7 (CHECKPOINT_16 mixing ladder) — no longer awaiting
+  sign-off. Current production table γ2 ≈ −0.218. Convergence at the
+  field-standard G=20 check (`benchmarks/computeNeff.m`): max
+  rank-folded R̂ ≈ 1.22, max(bulk, folded) ≈ 1.24 (CHECKPOINT_14); the
+  3-seed classical R̂ (production's own `convergence_rhat.csv` formula)
+  is 1.197. The ≥3-seed pool remains mandatory.
 - Phillips-curve slope weakly identified / prior-driven (~−0.16).
 - r* is the least-identified latent state (band ±2.5pp+) absent a
   neutral-rate proxy; `pi_e` is the only trend-inflation anchor. Would

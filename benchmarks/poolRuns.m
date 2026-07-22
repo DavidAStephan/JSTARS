@@ -1,3 +1,8 @@
+% jointstar.production('data.csv') is the canonical production path; this
+% script is a standalone diagnostic tool only and pools from its own
+% results/convcheck/ tree so it can never collide with (or poison) the
+% seed directories jointstar.production trusts.
+%
 % Pool the independent-seed SMC runs into one equal-weight mixture.
 % What this is (per the CHECKPOINT_10 math audit): an inter-seed-
 % uncertainty envelope, NOT a converged posterior. Each run is a
@@ -9,8 +14,8 @@
 % narrow on any dimension all seeds jointly miss. Preferable to any
 % single seed for reporting; not a substitute for better ridge mixing.
 
-dirs = {'results/production/seed42', 'results/production/seed7', 'results/production/seed101'};
-P = jointstar.defaultPriors('HierKappa', true);
+dirs = {'results/convcheck/seed42', 'results/convcheck/seed7', 'results/convcheck/seed101'};
+P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
 allP = []; allW = [];
 for r = 1:numel(dirs)
     snaps = dir(fullfile(dirs{r}, 'particles_stage_*.mat'));
@@ -36,7 +41,7 @@ for j = 1:d
 end
 tbl = table(string(P.names(:)), mu, sd, q(:, 1), q(:, 2), q(:, 3), ...
     'VariableNames', {'param', 'mean', 'sd', 'q05', 'q50', 'q95'});
-writetable(tbl, 'results/production/pooled_posterior.csv');
+writetable(tbl, 'results/convcheck/pooled_posterior.csv');
 
 sel = {'gamma1', 'gamma2', 'nu', 'phisum', 'phi2', 'xi1', 'rhoU', ...
     'rhohpp', 'sig_gz', 'sig_xi', 'sig_c', 'sme_y', 'kapy_20', 'kapu_20'};

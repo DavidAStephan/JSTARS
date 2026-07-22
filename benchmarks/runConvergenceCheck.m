@@ -1,3 +1,8 @@
+% jointstar.production('data.csv') is the canonical production path; this
+% script is a standalone diagnostic tool only and writes to its own
+% results/convcheck/ tree so it can never collide with (or poison) the
+% seed directories jointstar.production trusts.
+%
 % Gelman-style convergence check for the SMC estimator: run the FULL
 % final specification from independent seeds and compare posteriors.
 % Between-run agreement is the SMC analogue of R-hat -- the runs share no
@@ -18,17 +23,19 @@
 seeds = [42, 7, 101];
 dirs = {};
 for s = seeds
-    od = sprintf('results/production/seed%d', s);
+    od = sprintf('results/convcheck/seed%d', s);
     if ~isfile(fullfile(od, 'posterior_summary.csv'))
-        jointstar.estimate('data.csv', 'NParticles', 2000, ...
-            'MSteps', 2, 'Seed', s, 'OutDir', od, ...
-            'HierKappa', true, 'PieObs', true);
+        jointstar.estimate('data.csv', 'NParticles', 2000, 'MSteps', 2, ...
+            'Seed', s, 'HierKappa', true, 'PieObs', true, ...
+            'MutationTransform', true, 'StructuredBlocks', true, ...
+            'MStepsLadder', true, 'WasteFree', true, ...
+            'PoolAcuteOnly', true, 'ESSTargetFrac', 0.7, 'OutDir', od);
     end
     dirs{end + 1} = od; %#ok<AGROW>
 end
 fprintf('=== all runs done ===\n');
 
-P = jointstar.defaultPriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
 R = numel(dirs);
 mu = zeros(R, P.d); v = zeros(R, P.d);
 uniqFrac = zeros(R, 1); rstarEnd = zeros(R, 3);
@@ -54,7 +61,7 @@ rhat(ok) = sqrt(1 + B(ok) ./ W(ok));
 isBase = true(1, P.d);   % diagonal model: every parameter is "base" (no extension groups)
 tbl = table(string(P.names(:)), rhat(:), mu', 'VariableNames', ...
     {'param', 'rhat', 'means_by_seed'});
-writetable(splitvars(tbl), 'results/production/convergence_rhat.csv');
+writetable(splitvars(tbl), 'results/convcheck/convergence_rhat.csv');
 
 fprintf('\nunique-particle fraction at phi=1 per run: ');
 fprintf('%.2f ', uniqFrac); fprintf('\n');

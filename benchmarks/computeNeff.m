@@ -81,7 +81,7 @@ function T = computeNeff(seedDirs, outFile)
 %   param, neff, std_mean, post_sd, mcse_over_sd, rhat_classic,
 %   rhat_rank_bulk, rhat_rank_folded
 
-P = jointstar.defaultPriors('HierKappa', true);
+P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
 names = P.names(:);
 d = P.d;
 G = numel(seedDirs);
