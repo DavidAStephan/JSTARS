@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-07-23 08:05:41",
+  "git_commit": "932d2d3c552d044411e97ba4efbb9b9e85f61a64",
+  "data_file": "/Users/davidstephan/Documents/JSTARS/data.csv",
+  "data_sha256": "02a9944b145433e1bb2390902a801357526c1958f9961fc96c2f5a0c05d742fc",
+  "seeds": [
+    42,
+    7,
+    101
+  ],
+  "per_seed": [
+    {
+      "seed": 42,
+      "git_commit": "missing",
+      "timestamp": "missing",
+      "data_sha256": "missing"
+    },
+    {
+      "seed": 7,
+      "git_commit": "missing",
+      "timestamp": "missing",
+      "data_sha256": "missing"
+    },
+    {
+      "seed": 101,
+      "git_commit": "missing",
+      "timestamp": "missing",
+      "data_sha256": "missing"
+    }
+  ],
+  "n_params": 69,
+  "pooled_posterior_file": "results/production/pooled_posterior.csv",
+  "convergence_rhat_file": "results/production/convergence_rhat.csv",
+  "smoothed_states_file": "results/production/smoothed_states.csv"
+}

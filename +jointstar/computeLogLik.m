@@ -237,7 +237,12 @@ for t = 1:T
         ptrR = ptrR + nR;
     else
         Rt = colSlice(sys.Rdiag, t);
-        rinv_t = 1 ./ Rt(idx);
+        rv = Rt(idx);
+        if any(~isfinite(rv)) || any(rv <= 0)
+            logL = -Inf; aux = [];      % infeasible theta, not an error
+            return
+        end
+        rinv_t = 1 ./ rv;
         halfLogDetRinv = halfLogDetRinv + 0.5 * sum(log(rinv_t));
         iR(ptrR + 1:ptrR + nIdx) = row + (1:nIdx)';
         jR(ptrR + 1:ptrR + nIdx) = row + (1:nIdx)';
@@ -658,7 +663,12 @@ if canVectorize
         else
             RdiagMat = sys.Rdiag;
         end
-        rinvAll = 1 ./ RdiagMat(cache.obsMask);
+        rv = RdiagMat(cache.obsMask);
+        if any(~isfinite(rv)) || any(rv <= 0)
+            logL = -Inf; aux = [];      % infeasible theta, not an error
+            return
+        end
+        rinvAll = 1 ./ rv;
         iR = (1:nObs)'; jR = iR; vR = rinvAll;
         ptrR = nObs;
 
@@ -704,7 +714,12 @@ else
             ptrR = ptrR + nR;
         else
             Rt = colSlice(sys.Rdiag, t);
-            rinv_t = 1 ./ Rt(idx);
+            rv = Rt(idx);
+            if any(~isfinite(rv)) || any(rv <= 0)
+                logL = -Inf; aux = [];      % infeasible theta, not an error
+                return
+            end
+            rinv_t = 1 ./ rv;
             halfLogDetRinv = halfLogDetRinv + 0.5 * sum(log(rinv_t));
             iR(ptrR + 1:ptrR + nIdx) = row + (1:nIdx)';
             jR(ptrR + 1:ptrR + nIdx) = row + (1:nIdx)';

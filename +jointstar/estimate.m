@@ -309,10 +309,12 @@ end
 out = jointstar.runSMC(prob, opts);
 
 summary = jointstar.diagnostics(out, true);
-writetable(summary, fullfile(o.OutDir, 'posterior_summary.csv'));
+jointstar.writeTableAtomic(summary, fullfile(o.OutDir, 'posterior_summary.csv'));
 
 states = smoothedStates(P, out, dat, o.NStateDraws, cache);
-writetable(states, fullfile(o.OutDir, 'smoothed_states.csv'));
+jointstar.writeTableAtomic(states, fullfile(o.OutDir, 'smoothed_states.csv'));
+
+writeProvenance(o, P, dataFile, o.OutDir);
 
 results = struct('smc', out, 'summary', summary, 'states', states, ...
     'dat', dat, 'priors', P);
@@ -390,5 +392,52 @@ for s = 1:size(series, 1)
     tbl.([nm '_q05']) = q(X, 0.05);
     tbl.([nm '_med']) = q(X, 0.50);
     tbl.([nm '_q95']) = q(X, 0.95);
+end
+end
+
+function writeProvenance(o, P, dataFile, outDir)
+% Stamp this run's data vintage and resolved configuration to
+% provenance.json in outDir, so a later jointstar.production pool can
+% verify every seed it pools was estimated against the same data file
+% and the same configuration.  Deliberately non-fatal: a provenance
+% hiccup must never abort a run that otherwise took minutes to compute.
+try
+    repoRoot = fileparts(fileparts(mfilename('fullpath')));
+
+    [gitStatus, gitOut] = system(['git -C ''' repoRoot ''' rev-parse HEAD']);
+    if gitStatus == 0
+        gitCommit = strtrim(gitOut);
+    else
+        gitCommit = 'unknown';
+    end
+
+    dataFileAbs = char(java.io.File(dataFile).getAbsolutePath());
+
+    flags = struct('HierKappa', o.HierKappa, 'PieObs', o.PieObs, ...
+        'MutationTransform', o.MutationTransform, ...
+        'StructuredBlocks', o.StructuredBlocks, ...
+        'MStepsLadder', o.MStepsLadder, 'WasteFree', o.WasteFree, ...
+        'PoolAcuteOnly', o.PoolAcuteOnly, 'UseEvalCache', o.UseEvalCache);
+
+    s = struct( ...
+        'schema_version', 1, ...
+        'timestamp', char(datetime('now', 'Format', 'uuuu-MM-dd HH:mm:ss')), ...
+        'git_commit', gitCommit, ...
+        'matlab_version', version, ...
+        'data_file', dataFileAbs, ...
+        'data_sha256', jointstar.fileSha256(dataFileAbs), ...
+        'seed', o.Seed, ...
+        'n_particles', o.NParticles, ...
+        'msteps', o.MSteps, ...
+        'ess_target_frac', o.ESSTargetFrac, ...
+        'n_params', P.d, ...
+        'param_names', {cellstr(P.names)}, ...
+        'flags', flags);
+
+    fid = fopen(fullfile(outDir, 'provenance.json'), 'w');
+    fprintf(fid, '%s', jsonencode(s, 'PrettyPrint', true));
+    fclose(fid);
+catch err
+    warning('jointstar:provenance', 'failed to write provenance.json: %s', err.message);
 end
 end

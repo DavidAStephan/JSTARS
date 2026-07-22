@@ -142,6 +142,11 @@ for k = 1:numel(seeds)
         'PoolAcuteOnly', true, 'ESSTargetFrac', 0.7, 'OutDir', od);
 end
 
+% ---- provenance: verify data vintage + config agreement across seeds --
+% before pooling, so a stale/mismatched seed dir is caught with a clear
+% error rather than silently blended into the pooled table.
+[provInfo, haveProv] = verifyProvenanceLocal(seedDirs, seeds, dataFile);
+
 P = jointstar.defaultPriors('HierKappa', true, 'PoolAcuteOnly', true);
 
 % ---- pool posterior (benchmarks/poolRuns.m logic, replicated) ---------
@@ -157,6 +162,10 @@ fprintf('jointstar.production: max Rhat = %.3f, %d params with Rhat > 1.1\n', ..
 % ---- pooled smoothed states (average of per-seed quantile series) ----
 statesFile = fullfile(outRoot, 'smoothed_states.csv');
 poolStatesLocal(seedDirs, statesFile);
+
+% ---- pooled provenance: stamp the pool itself for later audits --------
+writePooledProvenanceLocal(outRoot, seeds, dataFile, provInfo, haveProv, ...
+    pooledFile, rhatFile, statesFile, P.d);
 
 % ---- headline output: pooled coefficient table ------------------------
 coefficients = readtable(pooledFile);
@@ -197,7 +206,7 @@ for j = 1:d
 end
 tbl = table(string(P.names(:)), mu, sd, q(:, 1), q(:, 2), q(:, 3), ...
     'VariableNames', {'param', 'mean', 'sd', 'q05', 'q50', 'q95'});
-writetable(tbl, outFile);
+jointstar.writeTableAtomic(tbl, outFile);
 end
 
 % ======================================================================
@@ -220,7 +229,7 @@ rhat = ones(1, P.d);
 rhat(ok) = sqrt(1 + B(ok) ./ W(ok));
 tbl = table(string(P.names(:)), rhat(:), mu', 'VariableNames', ...
     {'param', 'rhat', 'means_by_seed'});
-writetable(splitvars(tbl), outFile);
+jointstar.writeTableAtomic(splitvars(tbl), outFile);
 maxRhat = max(rhat(ok));
 nOver = nnz(rhat > 1.1 & ok);
 end
@@ -266,5 +275,129 @@ for k = 2:numel(dirs)
 end
 acc{:, :} = acc{:, :} / numel(dirs);
 tbl = [T(:, {'date'}), acc];
-writetable(tbl, outFile);
+jointstar.writeTableAtomic(tbl, outFile);
+end
+
+% ======================================================================
+function [provOut, haveProv] = verifyProvenanceLocal(dirs, seeds, dataFile)
+% Load each seed dir's provenance.json (if present) and check it against
+% the current data file and against the other seeds' provenance before
+% pooling.  A seed dir with no provenance.json is a pre-provenance run
+% (the shipped results/production/ seed dirs predate this feature) --
+% warn and keep going, never error.  A seed dir WITH provenance is held
+% to two hard checks: (1) its recorded data_sha256 must match the data
+% file NOW (data.csv changed since that seed was estimated is a real
+% correctness problem, not a warning); (2) its sampler/parameter
+% configuration must agree with every other provenance-bearing seed's
+% (comparing each to the first such seed is equivalent to full pairwise
+% agreement, since equality is transitive). git_commit is allowed to
+% differ across seeds (e.g. a doc-only commit between runs) -- only a
+% warning listing the distinct commits.
+nSeeds = numel(dirs);
+provOut = cell(1, nSeeds);
+haveProv = false(1, nSeeds);
+currentHash = jointstar.fileSha256(dataFile);
+refIdx = [];
+gitCommits = {};
+
+configFields = {'n_particles', 'msteps', 'ess_target_frac', 'n_params', ...
+    'param_names', 'flags'};
+
+for k = 1:nSeeds
+    pf = fullfile(dirs{k}, 'provenance.json');
+    if ~isfile(pf)
+        warning('jointstar:provenance', ...
+            'seed %d has no provenance.json (pre-provenance run); cannot verify data vintage or config', ...
+            seeds(k));
+        continue
+    end
+    prov = jsondecode(fileread(pf));
+    provOut{k} = prov;
+    haveProv(k) = true;
+    gitCommits{end + 1} = prov.git_commit; %#ok<AGROW>
+
+    if ~strcmp(prov.data_sha256, currentHash)
+        error('jointstar:dataVintage', ...
+            ['seed %d (%s) was estimated against a different data.csv ' ...
+             '(data_sha256 %s) than the current file (data_sha256 %s); ' ...
+             'data.csv changed since that seed was estimated -- ' ...
+             're-estimate that seed before pooling.'], ...
+            seeds(k), dirs{k}, prov.data_sha256, currentHash);
+    end
+
+    if isempty(refIdx)
+        refIdx = k;
+    else
+        ref = provOut{refIdx};
+        for f = 1:numel(configFields)
+            fn = configFields{f};
+            if ~isequaln(ref.(fn), prov.(fn))
+                error('jointstar:configMismatch', ...
+                    'seed %d and seed %d have differing "%s" in provenance.json (first differing field found)', ...
+                    seeds(refIdx), seeds(k), fn);
+            end
+        end
+    end
+end
+
+distinctCommits = unique(gitCommits);
+if numel(distinctCommits) > 1
+    warning('jointstar:provenance', ...
+        'pooled seeds were estimated at different git commits: %s', ...
+        strjoin(distinctCommits, ', '));
+end
+end
+
+% ======================================================================
+function writePooledProvenanceLocal(outRoot, seeds, dataFile, provOut, ...
+    haveProv, pooledFile, rhatFile, statesFile, nParams)
+% Stamp results/production/provenance.json for the POOLED outputs:
+% current data vintage/commit plus a per-seed roll-up of what each seed
+% was estimated against (or 'missing' for a pre-provenance seed dir).
+% Non-fatal, same rationale as jointstar.estimate's per-seed provenance.
+try
+    repoRoot = fileparts(fileparts(mfilename('fullpath')));
+    [gitStatus, gitOut] = system(['git -C ''' repoRoot ''' rev-parse HEAD']);
+    if gitStatus == 0
+        gitCommit = strtrim(gitOut);
+    else
+        gitCommit = 'unknown';
+    end
+
+    dataFileAbs = char(java.io.File(dataFile).getAbsolutePath());
+    currentHash = jointstar.fileSha256(dataFileAbs);
+
+    perSeed = struct('seed', {}, 'git_commit', {}, 'timestamp', {}, 'data_sha256', {});
+    for k = 1:numel(seeds)
+        perSeed(k).seed = seeds(k);
+        if haveProv(k)
+            perSeed(k).git_commit = provOut{k}.git_commit;
+            perSeed(k).timestamp = provOut{k}.timestamp;
+            perSeed(k).data_sha256 = provOut{k}.data_sha256;
+        else
+            perSeed(k).git_commit = 'missing';
+            perSeed(k).timestamp = 'missing';
+            perSeed(k).data_sha256 = 'missing';
+        end
+    end
+
+    s = struct( ...
+        'schema_version', 1, ...
+        'timestamp', char(datetime('now', 'Format', 'uuuu-MM-dd HH:mm:ss')), ...
+        'git_commit', gitCommit, ...
+        'data_file', dataFileAbs, ...
+        'data_sha256', currentHash, ...
+        'seeds', seeds, ...
+        'per_seed', perSeed, ...
+        'n_params', nParams, ...
+        'pooled_posterior_file', pooledFile, ...
+        'convergence_rhat_file', rhatFile, ...
+        'smoothed_states_file', statesFile);
+
+    fid = fopen(fullfile(outRoot, 'provenance.json'), 'w');
+    fprintf(fid, '%s', jsonencode(s, 'PrettyPrint', true));
+    fclose(fid);
+catch err
+    warning('jointstar:provenance', 'failed to write pooled provenance.json: %s', err.message);
+end
 end
